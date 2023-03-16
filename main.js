@@ -1,6 +1,9 @@
-import * as THREE from "https://unpkg.com/three/build/three.module.js";
+// import * as THREE from "https://unpkg.com/three/build/three.module.js";
+import * as THREE from "./three.module.js";
 import { OrbitControls } from "https://cdn.skypack.dev/three@0.132.2/examples/jsm/controls/OrbitControls.js";
-import * as TWEEN from "https://cdn.jsdelivr.net/npm/@tweenjs/tween.js@18.6.4/+esm"
+import { DragControls } from "https://cdn.skypack.dev/three@0.132.2/examples/jsm/controls/DragControls.js";
+import * as TWEEN from "https://cdn.jsdelivr.net/npm/@tweenjs/tween.js@18.6.4/+esm";
+
 const scene = new THREE.Scene();
 /* 
   FOV,
@@ -15,6 +18,10 @@ const camera = new THREE.PerspectiveCamera(
   1000
 );
 
+/* Set camera's initial position and view */
+camera.position.set(0, 50, 50);
+camera.lookAt(0, 0, 0);
+
 const renderer = new THREE.WebGLRenderer();
 /* Use width and height of area we want to fill */
 renderer.setSize(window.innerWidth, window.innerHeight);
@@ -25,7 +32,37 @@ const canvasElement = renderer.domElement;
 document.body.appendChild(canvasElement);
 
 /* Enable orbiting controls */
-const controls = new OrbitControls(camera, canvasElement);
+const orbitControls = new OrbitControls(camera, canvasElement);
+
+/* Create an AudioListener and add it to the camera */
+const audioListener = new THREE.AudioListener();
+camera.add(audioListener);
+
+/* Create a global audio source */
+const sound = new THREE.Audio(audioListener);
+
+// Load crowd sound and set it as the Audio object's buffer
+const audioLoader = new THREE.AudioLoader();
+audioLoader.load("audio/NBA_Crowd_Sound.mp3", function (buffer) {
+  sound.setBuffer(buffer);
+  sound.setLoop(true);
+  sound.setVolume(0.1);
+});
+
+/* Get the button and icon elements from the HTML */
+const volumeButton = document.getElementById("volume-button");
+const volumeIcon = document.getElementById("volume-icon");
+
+/* Add an event listener to the button to toggle the volume */
+volumeButton.addEventListener("click", () => {
+  if (sound.isPlaying) {
+    sound.pause();
+    volumeIcon.innerHTML = "volume_off";
+  } else {
+    sound.play();
+    volumeIcon.innerHTML = "volume_up";
+  }
+});
 
 /* Create and load textures */
 const textureLoader = new THREE.TextureLoader();
@@ -33,6 +70,7 @@ const ballTexture = textureLoader.load("textures/basketball_texture2.png");
 const ballNormalMap = textureLoader.load("textures/basketball_normal_map.png");
 const courtTexture = textureLoader.load("textures/blazers_court_texture2.jpg");
 const jumbotronTexture = textureLoader.load("textures/blazers_jumbotron.png");
+
 const backboardTexture = textureLoader.load("textures/nba_backboard.jpg");
 
 const netTexture = textureLoader.load("textures/net.png");
@@ -62,6 +100,7 @@ courtPlane.rotation.x = -Math.PI / 2;
 scene.add(courtPlane);
 
 /* Create the basketball geometry */
+const initialBallPosition = new THREE.Vector3(0, 5, 0);
 const createBasketball = () => {
   /* SphereGeometry -- radius, widthSegments, heightSegments */
   const geometry = new THREE.SphereGeometry(2, 30, 16);
@@ -71,12 +110,11 @@ const createBasketball = () => {
     roughness: 0.5, // Adjust the roughness to make the surface less shiny
   });
   const basketball = new THREE.Mesh(geometry, material);
-  basketball.position.set(0, 5, 0);
+  basketball.position.copy(initialBallPosition);
   return basketball;
 };
 const basketball = createBasketball();
-/* Add a userData property to the basketball mesh */
-basketball.userData = { isBasketball: true };
+basketball.name = "basketball";
 
 // Create a raycaster
 const raycaster = new THREE.Raycaster();
@@ -97,7 +135,7 @@ const onBasketballMouseDown = (event) => {
 
   // Check if any of the intersected objects have a userData property with isBasketball set to true
   const basketballClicked = intersects.some(
-    (intersect) => intersect.object.userData.isBasketball
+    (intersect) => intersect.object.name === "basketball"
   );
   if (basketballClicked) {
     console.log("Basketball clicked!");
@@ -107,12 +145,25 @@ const onBasketballMouseDown = (event) => {
     new TWEEN.Tween(basketball.rotation)
       .to({ y: basketball.rotation.y + 2 * Math.PI }, 1000)
       .start();
-
-    // basketball.position.set(0, 1, 0);
   }
 };
 canvasElement.addEventListener("mousedown", onBasketballMouseDown);
 scene.add(basketball);
+
+/* Helper Functions */
+const drawSquare = ({ shape, vertices }) => {
+  for (let i = 0; i < vertices.length; i++) {
+    if (i === 0) {
+      shape.moveTo(...vertices[i]);
+    } else {
+      shape.lineTo(...vertices[i]);
+    }
+  }
+  shape.lineTo(...vertices[0]);
+};
+
+const BOARD_LEFT_ROTATION_Y = Math.PI / 2;
+const BOARD_RIGHT_ROTATION_Y = -Math.PI / 2;
 
 /* Create a backboard */
 const createBackboard = ({ isLeftSide }) => {
@@ -150,14 +201,10 @@ const createBackboard = ({ isLeftSide }) => {
     [backboardWidth / 2 - borderWidth, -backboardHeight / 2 + borderWidth],
   ];
 
-  for (let i = 0; i < backboardBorderVertices.length; i++) {
-    if (i === 0) {
-      backboardBorderShape.moveTo(...backboardBorderVertices[i]);
-    } else {
-      backboardBorderShape.lineTo(...backboardBorderVertices[i]);
-    }
-  }
-  backboardBorderShape.lineTo(...backboardBorderVertices[0]);
+  drawSquare({
+    shape: backboardBorderShape,
+    vertices: backboardBorderVertices,
+  });
 
   const borderInnerShape = new THREE.Shape();
   const borderInnerVertices = [
@@ -179,14 +226,10 @@ const createBackboard = ({ isLeftSide }) => {
     ],
   ];
 
-  for (let i = 0; i < borderInnerVertices.length; i++) {
-    if (i === 0) {
-      borderInnerShape.moveTo(...borderInnerVertices[i]);
-    } else {
-      borderInnerShape.lineTo(...borderInnerVertices[i]);
-    }
-  }
-  borderInnerShape.lineTo(...borderInnerVertices[0]);
+  drawSquare({
+    shape: borderInnerShape,
+    vertices: borderInnerVertices,
+  });
   backboardBorderShape.holes.push(borderInnerShape);
 
   const borderGeometry = new THREE.ShapeGeometry(backboardBorderShape);
@@ -194,7 +237,6 @@ const createBackboard = ({ isLeftSide }) => {
   const backboardBorder = new THREE.Mesh(borderGeometry, borderMaterial);
 
   /* Create the white shooting square right behind the rim */
-
   const shootSquareShape = new THREE.Shape();
   const shootSquareWidth = 0.75;
   const shootSquareHeight = 0.75;
@@ -204,14 +246,11 @@ const createBackboard = ({ isLeftSide }) => {
     [shootSquareWidth, shootSquareHeight],
     [shootSquareWidth, -shootSquareHeight],
   ];
-  for (let i = 0; i < shootSquareVertices.length; i++) {
-    if (i === 0) {
-      shootSquareShape.moveTo(...shootSquareVertices[i]);
-    } else {
-      shootSquareShape.lineTo(...shootSquareVertices[i]);
-    }
-  }
-  shootSquareShape.lineTo(...shootSquareVertices[0]);
+
+  drawSquare({
+    shape: shootSquareShape,
+    vertices: shootSquareVertices,
+  });
 
   const shootSquareInnerShape = new THREE.Shape();
   const innerShootSquareWidth = 0.5;
@@ -223,14 +262,11 @@ const createBackboard = ({ isLeftSide }) => {
     [innerShootSquareWidth, -innerShootSquareHeight],
   ];
 
-  for (let i = 0; i < innerShootSquareVertices.length; i++) {
-    if (i === 0) {
-      shootSquareInnerShape.moveTo(...innerShootSquareVertices[i]);
-    } else {
-      shootSquareInnerShape.lineTo(...innerShootSquareVertices[i]);
-    }
-  }
-  shootSquareInnerShape.lineTo(...innerShootSquareVertices[0]);
+  drawSquare({
+    shape: shootSquareInnerShape,
+    vertices: innerShootSquareVertices,
+  });
+
   shootSquareShape.holes.push(shootSquareInnerShape);
 
   const backboardShootSquareGeometry = new THREE.ShapeGeometry(
@@ -307,13 +343,93 @@ const createBackboard = ({ isLeftSide }) => {
   return backboardGroup;
 };
 
+let leftShotClockTime = 24;
+let rightShotClockTime = 24;
+
+const createShotClock = ({ isLeftSide, position, rotation }) => {
+  /* TODO: Create shot-clock -- goes above the backboard */
+  const shotClockXPosition = position.x - 1;
+  const shotClockGeometry = new THREE.PlaneGeometry(3, 3);
+  const shotClockMaterial = new THREE.MeshBasicMaterial({
+    color: 0x000000,
+  });
+  const shotClock = new THREE.Mesh(shotClockGeometry, shotClockMaterial);
+
+  shotClock.position.set(shotClockXPosition, 10, 0);
+  shotClock.rotation.y = rotation.y;
+
+  // Define some variables for the text and font size
+  const text = "00";
+  const fontSize = 200;
+
+  // Create a canvas and context to draw the text onto
+  const canvas = document.createElement("canvas");
+  const context = canvas.getContext("2d");
+
+  // Set the canvas dimensions to match the desired text size
+  canvas.width = fontSize * 2;
+  canvas.height = fontSize;
+
+  // Set the font properties for the text
+  context.font = `${fontSize}px Arial`;
+  context.fillStyle = "white";
+  context.textAlign = "center";
+  context.textBaseline = "middle";
+
+  // Create a plane geometry and basic material
+  const geometry = new THREE.PlaneGeometry(3, 3);
+  const material = new THREE.MeshBasicMaterial({
+    transparent: true,
+  });
+
+  // Create a mesh and position it "above" the shot clock
+  const numberCanvas = new THREE.Mesh(geometry, material);
+  numberCanvas.position.set(position.x - 2, 10, 0);
+  numberCanvas.rotation.y = rotation.y;
+
+
+  const updateShotClock = () => {
+    const currentShotClockTime = isLeftSide ? leftShotClockTime : rightShotClockTime;
+
+    if (currentShotClockTime === 0) {
+      isLeftSide ? leftShotClockTime = 24 : rightShotClockTime = 24;
+    }
+    const newText =
+    currentShotClockTime < 10
+        ? `0${currentShotClockTime}`
+        : currentShotClockTime;
+    context.clearRect(0, 0, canvas.width, canvas.height);
+    context.fillText(newText, canvas.width / 2, canvas.height / 2);
+    isLeftSide ? leftShotClockTime-- : rightShotClockTime--;
+
+    // Create a texture from the canvas and update the material
+    const texture = new THREE.CanvasTexture(canvas);
+    numberCanvas.material.map = texture;
+    numberCanvas.material.needsUpdate = true;
+  };
+
+  setInterval(updateShotClock, 1000);
+
+  const shotClockGroup = new THREE.Group();
+  shotClockGroup.add(shotClock);
+  shotClockGroup.add(numberCanvas);
+
+  return shotClockGroup;
+};
+
 /* Create hoops */
 const createHoop = (side) => {
   const isLeftSide = side === "LEFT";
 
   /* Create the angled part of the stanchion */
-  /* BoxGeometry - width, height, depth */
-  const stanchionAngleGeometry = new THREE.BoxGeometry(0.85, 15, 0.5);
+  const stanchionAngleWidth = 0.85;
+  const stanchionAngleHeight = 10;
+  const stanchionAngleDepth = 0.5;
+  const stanchionAngleGeometry = new THREE.BoxGeometry(
+    stanchionAngleWidth,
+    stanchionAngleHeight,
+    stanchionAngleDepth
+  );
   const stanchionAngleMaterial = new THREE.MeshStandardMaterial({
     color: 0xbb2b25,
     // actual color: 0x261e1e
@@ -324,10 +440,10 @@ const createHoop = (side) => {
   );
 
   if (isLeftSide) {
-    stanchionAngle.position.set(2.25, 0, 0);
+    stanchionAngle.position.set(2.25, 5, 0);
     stanchionAngle.rotation.z = -Math.PI / 5;
   } else {
-    stanchionAngle.position.set(-2, 0, 0);
+    stanchionAngle.position.set(-2, 5, 0);
     stanchionAngle.rotation.z = Math.PI / 5;
   }
 
@@ -359,15 +475,19 @@ const createHoop = (side) => {
   const hoopTop = new THREE.Mesh(hoopTopGeometry, hoopTopMaterial);
   hoopTop.position.y = 2.7;
 
-  /* TODO: Create shot-clock -- goes above the backboard */
-  const shotClockGeometry = new THREE.PlaneGeometry(1.5, 1.5);
-
   /* Create the backboard */
   const backboardGroup = createBackboard({ isLeftSide });
+  const backboardGroupPosition = backboardGroup.position;
 
-  /* Create the net */
+  const shotClock = createShotClock({
+    isLeftSide,
+    position: backboardGroup.position,
+    rotation: backboardGroup.rotation,
+  });
 
-  /* Top of net should be an orange ring/circle - #eb6b25 */
+  /* Create the rim */
+
+  /* Top of rim should be an orange ring/circle - #eb6b25 */
 
   const netXPosition = isLeftSide ? 12 : -12;
 
@@ -422,6 +542,7 @@ const createHoop = (side) => {
   hoopGroup.add(stanchionGroup);
   hoopGroup.add(backboardGroup);
   // hoopGroup.add(hoopTop);
+  hoopGroup.add(shotClock);
   hoopGroup.add(netGroup);
   return hoopGroup;
 };
@@ -436,22 +557,55 @@ const hoop2 = createHoop("RIGHT");
 hoop2.position.set(45, 0, 0);
 scene.add(hoop2);
 
-camera.position.set(0, 50, 50);
-camera.lookAt(0, 0, 0);
-
 /* Create jumbotron at center of court */
 const createJumbotron = () => {
   /* Creates BoxGeometry with: width, height, depth */
-  const jumbotronGeometry = new THREE.BoxGeometry(12, 12, 5);
+  const jumbotronWidth = 12;
+  const jumbotronHeight = 12;
+  const jumbotronDepth = 5;
+
+  const jumbotronGeometry = new THREE.BoxGeometry(
+    jumbotronWidth,
+    jumbotronHeight,
+    jumbotronDepth
+  );
+
   const jumbotronMaterial = new THREE.MeshStandardMaterial({
     map: jumbotronTexture,
   });
   const jumbotron = new THREE.Mesh(jumbotronGeometry, jumbotronMaterial);
-  jumbotron.position.set(0, 30, 5);
-  return jumbotron;
+
+  // Create black materials for the top and bottom faces
+  const blackMaterial = new THREE.MeshBasicMaterial({ color: 0x000000 });
+
+  // Create meshes for the top and bottom faces
+  const topGeometry = new THREE.PlaneGeometry(jumbotronWidth, jumbotronDepth);
+  const jumboTop = new THREE.Mesh(topGeometry, blackMaterial);
+  jumboTop.position.set(0, jumbotronHeight / 2, 0);
+  jumboTop.rotation.x = -Math.PI / 2;
+
+  const bottomGeometry = new THREE.PlaneGeometry(
+    jumbotronWidth,
+    jumbotronDepth
+  );
+  const jumboBottom = new THREE.Mesh(bottomGeometry, blackMaterial);
+  jumboBottom.position.set(0, -jumbotronHeight / 2, 0);
+  jumboBottom.rotation.x = Math.PI / 2;
+
+  const jumbotronGroup = new THREE.Group();
+  jumbotronGroup.add(jumbotron);
+  jumbotronGroup.add(jumboTop);
+  jumbotronGroup.add(jumboBottom);
+
+  jumbotronGroup.position.set(0, 30, 5);
+  return jumbotronGroup;
 };
 const jumbotron = createJumbotron();
 scene.add(jumbotron);
+
+/* TODO: Create sideline --- announcers table, courtside seats */
+
+/* TODO: Create stands */
 
 /* Create rendering loop -- renderer draws the scene everytime screen refreshes (60hz) 
        Basically, anything you want to move or change while the app is running has to go through the animate loop. 
@@ -460,6 +614,33 @@ scene.add(jumbotron);
 
 let basketballY = 5;
 let basketballX = 0;
+
+/* Enable drag controls */
+const objects = [basketball];
+const dragControls = new DragControls(objects, camera, renderer.domElement);
+
+/* Disable orbit controls when dragging starts */
+dragControls.addEventListener("dragstart", () => {
+  orbitControls.enabled = false;
+});
+
+/* Enable orbit controls when dragging ends */
+dragControls.addEventListener("dragend", () => {
+  orbitControls.enabled = true;
+});
+
+dragControls.addEventListener("drag", (event) => {
+  const isBasketball = event.object.name === "basketball";
+
+  if (isBasketball) {
+    const { x, y, z } = event.object.position;
+    console.log({ x, y, z });
+
+    if (y < 0) {
+      basketball.position.copy(initialBallPosition);
+    }
+  }
+});
 
 const animate = () => {
   requestAnimationFrame(animate);
@@ -472,7 +653,7 @@ const animate = () => {
   /* Update TWEEN */
   TWEEN.update();
 
-  controls.update(); // update the controls
+  orbitControls.update(); // update the controls
 
   renderer.render(scene, camera);
 };

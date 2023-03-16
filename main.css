@@ -1,0 +1,13 @@
+#volume-button {
+    background: none;
+    border: none;
+    padding: 0;
+    position: absolute;
+    cursor: pointer;
+    user-select: none;
+}
+
+#volume-icon {
+    color: white;
+    font-size: 3rem;
+}
