@@ -2,7 +2,11 @@
 import * as THREE from "./three.module.js";
 import { OrbitControls } from "https://cdn.skypack.dev/three@0.132.2/examples/jsm/controls/OrbitControls.js";
 import { DragControls } from "https://cdn.skypack.dev/three@0.132.2/examples/jsm/controls/DragControls.js";
+// import * as Ammo from "https://cdn.skypack.dev/three@0.132.2/examples/jsm/libs/ammo.module.js";
+// import * as Ammo from "./ammo.js";
+
 import * as TWEEN from "https://cdn.jsdelivr.net/npm/@tweenjs/tween.js@18.6.4/+esm";
+
 
 const scene = new THREE.Scene();
 /* 
@@ -31,6 +35,13 @@ const canvasElement = renderer.domElement;
 /* Append canvas element */
 document.body.appendChild(canvasElement);
 
+// const physicsWorld = new Ammo.btDiscreteDynamicsWorld(
+//   new Ammo.btCollisionDispatcher(new Ammo.btDefaultCollisionConfiguration()),
+//   new Ammo.btDbvtBroadphase(),
+//   new Ammo.btSequentialImpulseConstraintSolver(),
+//   new Ammo.btDefaultCollisionConfiguration()
+// );
+
 /* Enable orbiting controls */
 const orbitControls = new OrbitControls(camera, canvasElement);
 
@@ -43,7 +54,8 @@ const sound = new THREE.Audio(audioListener);
 
 // Load crowd sound and set it as the Audio object's buffer
 const audioLoader = new THREE.AudioLoader();
-audioLoader.load("audio/NBA_Crowd_Sound.mp3", function (buffer) {
+
+audioLoader.load("audio/NBA_Crowd_Sound.mp3", (buffer) => {
   sound.setBuffer(buffer);
   sound.setLoop(true);
   sound.setVolume(0.1);
@@ -94,10 +106,12 @@ const planeGeometry = new THREE.PlaneGeometry(94, 50);
 const planeMaterial = new THREE.MeshBasicMaterial({
   map: courtTexture,
 });
-const courtPlane = new THREE.Mesh(planeGeometry, planeMaterial);
-courtPlane.rotation.x = -Math.PI / 2;
+const court = new THREE.Mesh(planeGeometry, planeMaterial);
+court.name = "court";
 
-scene.add(courtPlane);
+court.rotation.x = -Math.PI / 2;
+
+scene.add(court);
 
 /* Create the basketball geometry */
 const initialBallPosition = new THREE.Vector3(0, 5, 0);
@@ -110,11 +124,11 @@ const createBasketball = () => {
     roughness: 0.5, // Adjust the roughness to make the surface less shiny
   });
   const basketball = new THREE.Mesh(geometry, material);
+  basketball.name = "basketball";
   basketball.position.copy(initialBallPosition);
   return basketball;
 };
 const basketball = createBasketball();
-basketball.name = "basketball";
 
 // Create a raycaster
 const raycaster = new THREE.Raycaster();
@@ -342,14 +356,19 @@ const createBackboard = ({ isLeftSide }) => {
 
   return backboardGroup;
 };
+const QUARTER_LENGTH = 720; // 12 mins in seconds
+const SHOT_CLOCK_LENGTH = 24; // 24 seconds
 
-let leftShotClockTime = 24;
-let rightShotClockTime = 24;
+let leftShotClockTime = SHOT_CLOCK_LENGTH;
+let rightShotClockTime = SHOT_CLOCK_LENGTH;
+
+let leftGameClockTime = 60; // 12 mins in seconds
+let rightGameClockTime = 60; // 12 mins in seconds
 
 const createShotClock = ({ isLeftSide, position, rotation }) => {
-  /* TODO: Create shot-clock -- goes above the backboard */
   const shotClockXPosition = position.x - 1;
-  const shotClockGeometry = new THREE.PlaneGeometry(3, 3);
+
+  const shotClockGeometry = new THREE.BoxGeometry(3, 3, 0.3);
   const shotClockMaterial = new THREE.MeshBasicMaterial({
     color: 0x000000,
   });
@@ -358,11 +377,10 @@ const createShotClock = ({ isLeftSide, position, rotation }) => {
   shotClock.position.set(shotClockXPosition, 10, 0);
   shotClock.rotation.y = rotation.y;
 
-  // Define some variables for the text and font size
-  const text = "00";
+  /* Define some variables for the text and font size */
   const fontSize = 200;
 
-  // Create a canvas and context to draw the text onto
+  /* Create a canvas and context to draw the text onto */
   const canvas = document.createElement("canvas");
   const context = canvas.getContext("2d");
 
@@ -372,9 +390,11 @@ const createShotClock = ({ isLeftSide, position, rotation }) => {
 
   // Set the font properties for the text
   context.font = `${fontSize}px Arial`;
-  context.fillStyle = "white";
   context.textAlign = "center";
   context.textBaseline = "middle";
+
+  const GAME_CLOCK_COLOR = "#dc8e50";
+  const SHOT_CLOCK_COLOR = "#f44341";
 
   // Create a plane geometry and basic material
   const geometry = new THREE.PlaneGeometry(3, 3);
@@ -387,20 +407,69 @@ const createShotClock = ({ isLeftSide, position, rotation }) => {
   numberCanvas.position.set(position.x - 2, 10, 0);
   numberCanvas.rotation.y = rotation.y;
 
-
   const updateShotClock = () => {
-    const currentShotClockTime = isLeftSide ? leftShotClockTime : rightShotClockTime;
+    /* Clear the whole canvas */
+    context.clearRect(0, 0, canvas.width, canvas.height);
 
-    if (currentShotClockTime === 0) {
-      isLeftSide ? leftShotClockTime = 24 : rightShotClockTime = 24;
+    /* Determine which time variables to update */
+    let currentShotClockTime = rightShotClockTime;
+    let currentGameClockTime = rightGameClockTime;
+    if (isLeftSide) {
+      currentShotClockTime = leftShotClockTime;
+      currentGameClockTime = leftGameClockTime;
     }
-    const newText =
-    currentShotClockTime < 10
+
+    const isLastMinute = currentGameClockTime < 60;
+    let gameClockText = "";
+    if (isLastMinute) {
+      // Display the remaining time in minutes:seconds.tenths format
+      const remainingSeconds = (currentGameClockTime % 60).toFixed(1);
+      const [seconds, tenths] = remainingSeconds.split(".");
+      gameClockText = `${seconds}.${tenths}`;
+    } else {
+      // Display the remaining time in minutes:seconds format
+      const minutes = Math.floor(currentGameClockTime / 60);
+      const seconds = currentGameClockTime % 60;
+      gameClockText = `${minutes}:${seconds < 10 ? "0" : ""}${seconds}`;
+    }
+
+    /* Draw updated game clock and decrement times */
+    context.font = `${fontSize / 2}px Arial`;
+    context.fillStyle = GAME_CLOCK_COLOR;
+    const gameClockX = canvas.width / 2;
+    const gameClockY = canvas.height / 2 - 50;
+    context.fillText(gameClockText, gameClockX, gameClockY);
+    isLeftSide ? leftGameClockTime-- : rightGameClockTime--;
+
+    const shotClockText =
+      currentShotClockTime < 10
         ? `0${currentShotClockTime}`
         : currentShotClockTime;
-    context.clearRect(0, 0, canvas.width, canvas.height);
-    context.fillText(newText, canvas.width / 2, canvas.height / 2);
+
+    /* Draw updated 24-second clock and decrement times */
+    const shotClockX = canvas.width / 2;
+    const shotClockY = canvas.height / 2 + 50;
+    context.fillStyle = SHOT_CLOCK_COLOR;
+    context.fillText(shotClockText, shotClockX, shotClockY);
     isLeftSide ? leftShotClockTime-- : rightShotClockTime--;
+
+    /* Reset game clock time back to 12 mins when it reaches 0*/
+    if (currentGameClockTime === 0) {
+      if (isLeftSide) {
+        leftGameClockTime = QUARTER_LENGTH;
+      } else {
+        rightGameClockTime = QUARTER_LENGTH;
+      }
+    }
+
+    /* Reset shot clock time back to 24 seconds when it reaches 0*/
+    if (currentShotClockTime === 0) {
+      if (isLeftSide) {
+        leftShotClockTime = SHOT_CLOCK_LENGTH;
+      } else {
+        rightShotClockTime = SHOT_CLOCK_LENGTH;
+      }
+    }
 
     // Create a texture from the canvas and update the material
     const texture = new THREE.CanvasTexture(canvas);
@@ -408,6 +477,7 @@ const createShotClock = ({ isLeftSide, position, rotation }) => {
     numberCanvas.material.needsUpdate = true;
   };
 
+  /* Update the shot clock every second */
   setInterval(updateShotClock, 1000);
 
   const shotClockGroup = new THREE.Group();
@@ -501,12 +571,12 @@ const createHoop = (side) => {
     hoopRadius + netWidth / 2,
     32
   );
-  const netTopMaterial = new THREE.MeshBasicMaterial({
+  const rimMaterial = new THREE.MeshBasicMaterial({
     color: 0xeb6b25,
   });
-  const netTop = new THREE.Mesh(netTopGeometry, netTopMaterial);
-  netTop.rotation.x = -Math.PI / 2; // rotate the ring to be flat
-  netTop.position.set(netXPosition, netTopPositionY, 0); // position at the top of the cylinder
+  const rim = new THREE.Mesh(netTopGeometry, rimMaterial);
+  rim.rotation.x = -Math.PI / 2; // rotate the ring to be flat
+  rim.position.set(netXPosition, netTopPositionY, 0); // position at the top of the cylinder
 
   /* Create the net itself */
 
@@ -531,10 +601,12 @@ const createHoop = (side) => {
     depthWrite: false,
   });
   const net = new THREE.Mesh(netGeometry, netMaterial);
+  net.name = "net";
+
   net.position.set(netXPosition, 5, 0);
 
   const netGroup = new THREE.Group();
-  netGroup.add(netTop);
+  netGroup.add(rim);
   netGroup.add(net);
 
   /* Group all the hoop components together */
