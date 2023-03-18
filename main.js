@@ -7,7 +7,6 @@ import { DragControls } from "https://cdn.skypack.dev/three@0.132.2/examples/jsm
 
 import * as TWEEN from "https://cdn.jsdelivr.net/npm/@tweenjs/tween.js@18.6.4/+esm";
 
-
 const scene = new THREE.Scene();
 /* 
   FOV,
@@ -76,6 +75,12 @@ volumeButton.addEventListener("click", () => {
   }
 });
 
+/* COLORS */
+const GAME_CLOCK_COLOR = "#dc8e50";
+const SHOT_CLOCK_COLOR = "#f44341";
+const RIM_COLOR = "#eb6b25";
+const STANCHION_COLOR = "#261e1e";
+
 /* Create and load textures */
 const textureLoader = new THREE.TextureLoader();
 const ballTexture = textureLoader.load("textures/basketball_texture2.png");
@@ -101,15 +106,16 @@ light.position.set(0, 10, 10).normalize();
 scene.add(light);
 
 /* Create the court plane */
-const planeGeometry = new THREE.PlaneGeometry(94, 50);
+const courtGeometry = new THREE.BoxGeometry(94, 0.1, 50);
+const uvAttribute = courtGeometry.getAttribute("uv");
+const uvArray = uvAttribute.array;
+
 /* .map : Texture ==> The color map. May optionally include an alpha channel, typically combined with .transparent or .alphaTest. Default is null. */
-const planeMaterial = new THREE.MeshBasicMaterial({
+const courtMaterial = new THREE.MeshBasicMaterial({
   map: courtTexture,
 });
-const court = new THREE.Mesh(planeGeometry, planeMaterial);
+const court = new THREE.Mesh(courtGeometry, courtMaterial);
 court.name = "court";
-
-court.rotation.x = -Math.PI / 2;
 
 scene.add(court);
 
@@ -362,15 +368,27 @@ const SHOT_CLOCK_LENGTH = 24; // 24 seconds
 let leftShotClockTime = SHOT_CLOCK_LENGTH;
 let rightShotClockTime = SHOT_CLOCK_LENGTH;
 
-let leftGameClockTime = 60; // 12 mins in seconds
-let rightGameClockTime = 60; // 12 mins in seconds
+let leftGameClockTime = QUARTER_LENGTH; // 12 mins in seconds
+let rightGameClockTime = QUARTER_LENGTH; // 12 mins in seconds
 
 const createShotClock = ({ isLeftSide, position, rotation }) => {
-  const shotClockXPosition = position.x - 1;
+  const shotClockXIncrement = isLeftSide ? -0.7 : 0.7;
+  const shotClockYIncrement = isLeftSide ? -1 : 1;
 
-  const shotClockGeometry = new THREE.BoxGeometry(3, 3, 0.3);
+  const shotClockXPosition = position.x + shotClockXIncrement;
+  const shotClockYPosition = 10 + shotClockYIncrement;
+
+  const shotClockWidth = 2.25;
+  const shotClockHeight = 3;
+  const shotClockDepth = 0.3;
+
+  const shotClockGeometry = new THREE.BoxGeometry(
+    shotClockWidth,
+    shotClockHeight,
+    shotClockDepth
+  );
   const shotClockMaterial = new THREE.MeshBasicMaterial({
-    color: 0x000000,
+    color: "black",
   });
   const shotClock = new THREE.Mesh(shotClockGeometry, shotClockMaterial);
 
@@ -387,14 +405,10 @@ const createShotClock = ({ isLeftSide, position, rotation }) => {
   // Set the canvas dimensions to match the desired text size
   canvas.width = fontSize * 2;
   canvas.height = fontSize;
-
   // Set the font properties for the text
   context.font = `${fontSize}px Arial`;
   context.textAlign = "center";
   context.textBaseline = "middle";
-
-  const GAME_CLOCK_COLOR = "#dc8e50";
-  const SHOT_CLOCK_COLOR = "#f44341";
 
   // Create a plane geometry and basic material
   const geometry = new THREE.PlaneGeometry(3, 3);
@@ -404,7 +418,9 @@ const createShotClock = ({ isLeftSide, position, rotation }) => {
 
   // Create a mesh and position it "above" the shot clock
   const numberCanvas = new THREE.Mesh(geometry, material);
-  numberCanvas.position.set(position.x - 2, 10, 0);
+  const numberCanvasIncrement = isLeftSide ? shotClockDepth : -shotClockDepth;
+  const numberCanvasPosition = shotClockXPosition + numberCanvasIncrement;
+  numberCanvas.position.set(numberCanvasPosition, 10, 0);
   numberCanvas.rotation.y = rotation.y;
 
   const updateShotClock = () => {
@@ -480,9 +496,36 @@ const createShotClock = ({ isLeftSide, position, rotation }) => {
   /* Update the shot clock every second */
   setInterval(updateShotClock, 1000);
 
+  /* Create "frame" bars that connect shot clock to back of the rim */
+  const frameBarRadius = 0.25;
+  const frameBarHeight = 1.5;
+  const frameBarGeometry = new THREE.CylinderGeometry(
+    frameBarRadius,    
+    frameBarRadius,
+    frameBarHeight,
+  )
+
+  const frameBarMaterial = new THREE.MeshStandardMaterial({
+    color: STANCHION_COLOR,
+  });
+  const frameBar1 = new THREE.Mesh(frameBarGeometry, frameBarMaterial);
+  const frameBar2 = new THREE.Mesh(frameBarGeometry, frameBarMaterial);
+  
+  frameBar1.position.set(shotClockXPosition, 10, 0.5);
+  frameBar2.position.set(shotClockXPosition, 10, -0.5);
+
+  frameBar1.rotation.x = -Math.PI / 4;
+  frameBar1.rotation.z = -Math.PI / 4;
+  
+  frameBar2.rotation.x = Math.PI / 4;
+  frameBar2.rotation.z = Math.PI / 4;
+
+  /* Create a group to hold all the shot clock elements */
   const shotClockGroup = new THREE.Group();
   shotClockGroup.add(shotClock);
   shotClockGroup.add(numberCanvas);
+  shotClockGroup.add(frameBar1);
+  shotClockGroup.add(frameBar2);
 
   return shotClockGroup;
 };
@@ -501,8 +544,7 @@ const createHoop = (side) => {
     stanchionAngleDepth
   );
   const stanchionAngleMaterial = new THREE.MeshStandardMaterial({
-    color: 0xbb2b25,
-    // actual color: 0x261e1e
+    color: STANCHION_COLOR,
   });
   const stanchionAngle = new THREE.Mesh(
     stanchionAngleGeometry,
@@ -511,10 +553,10 @@ const createHoop = (side) => {
 
   if (isLeftSide) {
     stanchionAngle.position.set(2.25, 5, 0);
-    stanchionAngle.rotation.z = -Math.PI / 5;
+    // stanchionAngle.rotation.z = -Math.PI / 5;
   } else {
     stanchionAngle.position.set(-2, 5, 0);
-    stanchionAngle.rotation.z = Math.PI / 5;
+    // stanchionAngle.rotation.z = Math.PI / 5;
   }
 
   /* Create the arm that connects the stanchion to the backboard */
@@ -525,14 +567,16 @@ const createHoop = (side) => {
   });
   const arm = new THREE.Mesh(armGeometry, armMaterial);
   const armXPosition = isLeftSide ? 8.25 : -8.25;
-  arm.position.set(armXPosition, 6.5, 0);
+  const armYPosition = 6.5;
+  arm.position.set(armXPosition, armYPosition, 0);
 
   /* Create the base of the stanchion */
   const baseGeometry = new THREE.BoxGeometry(3, 1.25, 2);
   const baseMaterial = new THREE.MeshStandardMaterial({ color: 0x261e1e });
   const base = new THREE.Mesh(baseGeometry, baseMaterial);
   const baseXPosition = isLeftSide ? 1.5 : -0.75;
-  base.position.set(baseXPosition, 0, 0);
+  const baseYPosition = 1;
+  base.position.set(baseXPosition, baseYPosition, 0);
 
   /* Group the parts of the stanchion together */
   const stanchionGroup = new THREE.Group();
@@ -547,8 +591,6 @@ const createHoop = (side) => {
 
   /* Create the backboard */
   const backboardGroup = createBackboard({ isLeftSide });
-  const backboardGroupPosition = backboardGroup.position;
-
   const shotClock = createShotClock({
     isLeftSide,
     position: backboardGroup.position,
@@ -556,8 +598,6 @@ const createHoop = (side) => {
   });
 
   /* Create the rim */
-
-  /* Top of rim should be an orange ring/circle - #eb6b25 */
 
   const netXPosition = isLeftSide ? 12 : -12;
 
@@ -572,7 +612,7 @@ const createHoop = (side) => {
     32
   );
   const rimMaterial = new THREE.MeshBasicMaterial({
-    color: 0xeb6b25,
+    color: RIM_COLOR,
   });
   const rim = new THREE.Mesh(netTopGeometry, rimMaterial);
   rim.rotation.x = -Math.PI / 2; // rotate the ring to be flat
@@ -619,14 +659,16 @@ const createHoop = (side) => {
   return hoopGroup;
 };
 
+const HOOP_X_POSITION = 45;
+
 /* Create the "left" hoop */
 const hoop1 = createHoop("LEFT");
-hoop1.position.set(-45, 0, 0);
+hoop1.position.set(-HOOP_X_POSITION, 0, 0);
 scene.add(hoop1);
 
 /* Create the "right" hoop */
 const hoop2 = createHoop("RIGHT");
-hoop2.position.set(45, 0, 0);
+hoop2.position.set(HOOP_X_POSITION, 0, 0);
 scene.add(hoop2);
 
 /* Create jumbotron at center of court */
@@ -669,7 +711,7 @@ const createJumbotron = () => {
   jumbotronGroup.add(jumboTop);
   jumbotronGroup.add(jumboBottom);
 
-  jumbotronGroup.position.set(0, 30, 5);
+  jumbotronGroup.position.set(0, 35, 0);
   return jumbotronGroup;
 };
 const jumbotron = createJumbotron();
@@ -692,12 +734,12 @@ const objects = [basketball];
 const dragControls = new DragControls(objects, camera, renderer.domElement);
 
 /* Disable orbit controls when dragging starts */
-dragControls.addEventListener("dragstart", () => {
+dragControls.addEventListener("dragstart", (event) => {
   orbitControls.enabled = false;
 });
 
 /* Enable orbit controls when dragging ends */
-dragControls.addEventListener("dragend", () => {
+dragControls.addEventListener("dragend", (event) => {
   orbitControls.enabled = true;
 });
 
