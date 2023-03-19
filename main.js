@@ -90,6 +90,8 @@ const jumbotronTexture = textureLoader.load("textures/blazers_jumbotron.png");
 
 const backboardTexture = textureLoader.load("textures/nba_backboard.jpg");
 
+const crowdTexture = textureLoader.load("textures/blazers_crowd_1.png");
+
 const netTexture = textureLoader.load("textures/net.png");
 netTexture.repeat.set(2, 0.7);
 netTexture.offset.set(0, 0.3);
@@ -98,15 +100,22 @@ netTexture.wrapS = THREE.RepeatWrapping;
 /* Add lighting
 - DirectionalLight() - light color, intensity
 */
-const ambientLight = new THREE.AmbientLight(0xffffff, 0.4);
+const ambientLight = new THREE.AmbientLight("white", 0.4);
 scene.add(ambientLight);
 
-const light = new THREE.DirectionalLight(0xffffff, 1);
+const light = new THREE.DirectionalLight("white", 1);
 light.position.set(0, 10, 10).normalize();
 scene.add(light);
 
 /* Create the court plane */
-const courtGeometry = new THREE.BoxGeometry(94, 0.1, 50);
+const courtWidth = 94;
+const courtHeight = 0.1;
+const courtDepth = 50;
+const courtGeometry = new THREE.BoxGeometry(
+  courtWidth, 
+  courtHeight, 
+  courtDepth
+);
 const uvAttribute = courtGeometry.getAttribute("uv");
 const uvArray = uvAttribute.array;
 
@@ -119,11 +128,59 @@ court.name = "court";
 
 scene.add(court);
 
+/* TODO: Review this, but covering underneath court with black surface */
+const coverGeometry = new THREE.BoxGeometry(
+  courtWidth, 
+  0.05, 
+  courtDepth
+);
+const coverMaterial = new THREE.MeshBasicMaterial({ color: "black" });
+const cover = new THREE.Mesh(coverGeometry, coverMaterial);
+cover.position.set(0, -0.05, 0);
+scene.add(cover);
+
+/* Create the crowd */
+
+/* 
+- Different width for each crowd position
+*/
+
+const crowdWidth = 50;
+const crowdHeight = 20;
+
+// create an array of positions in polar coordinates around the court
+const crowdPositions = [
+  { radius: 47.5, angle: 0 },
+  { radius: 27, angle: Math.PI },
+  { radius: 47.5, angle: Math.PI / 2 },
+  { radius: 47.5, angle: -Math.PI / 2 },
+];
+
+const crowdMaterials = new THREE.MeshBasicMaterial({ map: crowdTexture });
+
+// create a crowd geometry for each position and add it to the scene
+for (const position of crowdPositions) {
+  const crowdGeometry = new THREE.PlaneGeometry(crowdWidth, crowdHeight);
+  const crowd = new THREE.Mesh(crowdGeometry, crowdMaterials);
+  const x = position.radius * Math.sin(position.angle);
+  const z = position.radius * Math.cos(position.angle);
+  crowd.position.set(x, 10, z);
+  crowd.rotation.y = position.angle;
+  scene.add(crowd);
+}
+
 /* Create the basketball geometry */
 const initialBallPosition = new THREE.Vector3(0, 5, 0);
 const createBasketball = () => {
   /* SphereGeometry -- radius, widthSegments, heightSegments */
-  const geometry = new THREE.SphereGeometry(2, 30, 16);
+  const basketballRadius = 1.05;
+  const ballWidthSegments = 30;
+  const ballHeightSegments = 16;
+  const geometry = new THREE.SphereGeometry(
+    basketballRadius,
+    ballWidthSegments,
+    ballHeightSegments
+  );
   const material = new THREE.MeshStandardMaterial({
     map: ballTexture,
     normalMap: ballNormalMap,
@@ -182,22 +239,24 @@ const drawSquare = ({ shape, vertices }) => {
   shape.lineTo(...vertices[0]);
 };
 
-const BOARD_LEFT_ROTATION_Y = Math.PI / 2;
-const BOARD_RIGHT_ROTATION_Y = -Math.PI / 2;
+const BACKBOARD_X = 10.5;
+const BACKBOARD_Y = 7;
+const BOARD_ROTATION_Y = Math.PI / 2;
 
 /* Create a backboard */
 const createBackboard = ({ isLeftSide }) => {
   const backboardWidth = 4;
   const backboardHeight = 3;
+  const backboardDepth = 0.2;
 
   /* Create the main backboard itself */
-  const backboardGeometry = new THREE.PlaneGeometry(
+  const backboardGeometry = new THREE.BoxGeometry(
     backboardWidth,
-    backboardHeight
+    backboardHeight,
+    backboardDepth
   );
 
   const backboardMaterial = new THREE.MeshPhysicalMaterial({
-    color: 0xffffff,
     transparent: true,
     opacity: 0.5,
     clearcoat: 1.0,
@@ -259,7 +318,7 @@ const createBackboard = ({ isLeftSide }) => {
   /* Create the white shooting square right behind the rim */
   const shootSquareShape = new THREE.Shape();
   const shootSquareWidth = 0.75;
-  const shootSquareHeight = 0.75;
+  const shootSquareHeight = 0.65;
   const shootSquareVertices = [
     [-shootSquareWidth, -shootSquareHeight],
     [-shootSquareWidth, shootSquareHeight],
@@ -289,17 +348,16 @@ const createBackboard = ({ isLeftSide }) => {
 
   shootSquareShape.holes.push(shootSquareInnerShape);
 
-  const backboardShootSquareGeometry = new THREE.ShapeGeometry(
-    shootSquareShape
-  );
-  const backboardShootSquareMaterial = new THREE.MeshBasicMaterial({
-    color: 0xffffff,
+  const shootSquareGeometry = new THREE.ShapeGeometry(shootSquareShape);
+  const shootSquareMaterial = new THREE.MeshBasicMaterial({
+    color: "white",
     transparent: true,
   });
-  const backboardShootSquare = new THREE.Mesh(
-    backboardShootSquareGeometry,
-    backboardShootSquareMaterial
-  );
+  const shootSquare = new THREE.Mesh(shootSquareGeometry, shootSquareMaterial);
+
+  /* Position the shoot square */
+  const shootSquareYPos = backboardHeight - 3.4;
+  shootSquare.position.set(0, shootSquareYPos, 0.2);
 
   /* TODO: Black unclosed rectangle on the bottom border */
 
@@ -345,23 +403,26 @@ const createBackboard = ({ isLeftSide }) => {
   const backboardGroup = new THREE.Group();
   backboardGroup.add(backboard);
   backboardGroup.add(backboardBorder);
-  backboardGroup.add(backboardShootSquare);
-  backboardGroup.add(bottomPadding);
+  backboardGroup.add(shootSquare);
+  // TODO: Fix the bottom padding
+  // backboardGroup.add(bottomPadding);
 
   backboard.position.set(0, 0, 0);
   /* Set the border slightly behind the backboard */
   backboardBorder.position.set(0, 0, -0.01);
 
   if (isLeftSide) {
-    backboardGroup.position.set(10.5, 7, 0);
-    backboardGroup.rotation.y = Math.PI / 2;
+    backboardGroup.position.set(BACKBOARD_X, BACKBOARD_Y, 0);
+    backboardGroup.rotation.y = BOARD_ROTATION_Y;
   } else {
-    backboardGroup.position.set(-10.5, 7, 0);
-    backboardGroup.rotation.y = -Math.PI / 2;
+    backboardGroup.position.set(-BACKBOARD_X, BACKBOARD_Y, 0);
+    backboardGroup.rotation.y = -BOARD_ROTATION_Y;
   }
 
   return backboardGroup;
 };
+
+/* Shot Clock Vars */
 const QUARTER_LENGTH = 720; // 12 mins in seconds
 const SHOT_CLOCK_LENGTH = 24; // 24 seconds
 
@@ -500,23 +561,23 @@ const createShotClock = ({ isLeftSide, position, rotation }) => {
   const frameBarRadius = 0.25;
   const frameBarHeight = 1.5;
   const frameBarGeometry = new THREE.CylinderGeometry(
-    frameBarRadius,    
     frameBarRadius,
-    frameBarHeight,
-  )
+    frameBarRadius,
+    frameBarHeight
+  );
 
   const frameBarMaterial = new THREE.MeshStandardMaterial({
     color: STANCHION_COLOR,
   });
   const frameBar1 = new THREE.Mesh(frameBarGeometry, frameBarMaterial);
   const frameBar2 = new THREE.Mesh(frameBarGeometry, frameBarMaterial);
-  
+
   frameBar1.position.set(shotClockXPosition, 10, 0.5);
   frameBar2.position.set(shotClockXPosition, 10, -0.5);
 
   frameBar1.rotation.x = -Math.PI / 4;
   frameBar1.rotation.z = -Math.PI / 4;
-  
+
   frameBar2.rotation.x = Math.PI / 4;
   frameBar2.rotation.z = Math.PI / 4;
 
@@ -534,14 +595,35 @@ const createShotClock = ({ isLeftSide, position, rotation }) => {
 const createHoop = (side) => {
   const isLeftSide = side === "LEFT";
 
+  /* Create the main part of the stanchion */
+  const stanchionMainWidth = 0.85;
+  const stanchionMainHeight = 4.35;
+  const stanchionMainDepth = 1.35;
+  const stanchionMainGeometry = new THREE.BoxGeometry(
+    stanchionMainWidth,
+    stanchionMainHeight,
+    stanchionMainDepth
+  );
+  const stanchionMainMaterial = new THREE.MeshStandardMaterial({
+    color: STANCHION_COLOR,
+  });
+  const stanchionMain = new THREE.Mesh(
+    stanchionMainGeometry,
+    stanchionMainMaterial
+  );
+
+  const stanchionMainXPos = isLeftSide ? 2.58 : -1.85;
+  const stanchionMainYPos = 3.8;
+  stanchionMain.position.set(stanchionMainXPos, stanchionMainYPos, 0);
+
   /* Create the angled part of the stanchion */
-  const stanchionAngleWidth = 0.85;
-  const stanchionAngleHeight = 10;
-  const stanchionAngleDepth = 0.5;
+  const stanchionAngleWidth = 2;
+  const stanchionAngleHeight = 1;
+  // const stanchionAngleDepth = 1.25;
   const stanchionAngleGeometry = new THREE.BoxGeometry(
     stanchionAngleWidth,
     stanchionAngleHeight,
-    stanchionAngleDepth
+    stanchionMainDepth
   );
   const stanchionAngleMaterial = new THREE.MeshStandardMaterial({
     color: STANCHION_COLOR,
@@ -551,17 +633,52 @@ const createHoop = (side) => {
     stanchionAngleMaterial
   );
 
-  if (isLeftSide) {
-    stanchionAngle.position.set(2.25, 5, 0);
-    // stanchionAngle.rotation.z = -Math.PI / 5;
-  } else {
-    stanchionAngle.position.set(-2, 5, 0);
-    // stanchionAngle.rotation.z = Math.PI / 5;
+  const stanchionAngleRotation = isLeftSide ? Math.PI / 5 : -Math.PI / 5;
+  const stanchionAngleXMod = isLeftSide ? 0.65 : -0.65;
+  const stanchionAngleXPos = stanchionMainXPos + stanchionAngleXMod;
+  const stanchionAngleYPos = 6.25;
+  stanchionAngle.position.set(stanchionAngleXPos, stanchionAngleYPos, 0);
+  stanchionAngle.rotation.z = stanchionAngleRotation;
+
+  /* Create stanchion bar */
+  const stanchionBarWidth = 0.5;
+  let stanchionBarHeight = 2;
+  if (!isLeftSide) {
+    stanchionBarHeight += 0.85;
   }
+  const stanchionBarDepth = 0.8;
+  const stanchionBarGeometry = new THREE.BoxGeometry(
+    stanchionBarWidth,
+    stanchionBarHeight,
+    stanchionBarDepth
+  );
+  const stanchionBarMaterial = new THREE.MeshStandardMaterial({
+    color: STANCHION_COLOR,
+  });
+  const stanchionBar = new THREE.Mesh(
+    stanchionBarGeometry,
+    stanchionBarMaterial
+  );
+
+  let stanchionBarXPos = isLeftSide ? 5 : -5;
+  if (!isLeftSide) {
+    stanchionBarXPos += 0.425;
+  }
+  stanchionBar.position.set(stanchionBarXPos, 6.5, 0);
+  const stanchionBarRotation = isLeftSide ? Math.PI / 2 : -Math.PI / 2;
+  stanchionBar.rotation.z = stanchionBarRotation;
 
   /* Create the arm that connects the stanchion to the backboard */
   const stanchionArmColor = 0xbb2b25;
-  const armGeometry = new THREE.BoxGeometry(4.5, 1, 0.75);
+  const stanchionArmWidth = 4.5;
+  const stanchionArmHeight = 0.75;
+  const stanchionArmDepth = 0.75;
+
+  const armGeometry = new THREE.BoxGeometry(
+    stanchionArmWidth,
+    stanchionArmHeight,
+    stanchionArmDepth
+  );
   const armMaterial = new THREE.MeshStandardMaterial({
     color: stanchionArmColor,
   });
@@ -580,17 +697,16 @@ const createHoop = (side) => {
 
   /* Group the parts of the stanchion together */
   const stanchionGroup = new THREE.Group();
+  stanchionGroup.add(stanchionMain);
   stanchionGroup.add(stanchionAngle);
+  stanchionGroup.add(stanchionBar);
   stanchionGroup.add(arm);
   stanchionGroup.add(base);
 
-  const hoopTopGeometry = new THREE.SphereGeometry(0.5, 32, 32);
-  const hoopTopMaterial = new THREE.MeshStandardMaterial({ color: 0xffffff });
-  const hoopTop = new THREE.Mesh(hoopTopGeometry, hoopTopMaterial);
-  hoopTop.position.y = 2.7;
-
   /* Create the backboard */
   const backboardGroup = createBackboard({ isLeftSide });
+
+  /* Create the shot clock */
   const shotClock = createShotClock({
     isLeftSide,
     position: backboardGroup.position,
@@ -598,15 +714,29 @@ const createHoop = (side) => {
   });
 
   /* Create the rim */
-
-  const netXPosition = isLeftSide ? 12 : -12;
+  const netXPos = backboardGroup.position.x + (isLeftSide ? 1 : -1);
 
   const hoopRadius = 0.7;
   const netWidth = 0.1;
   const netHeight = 1.5;
-  const netTopPositionY = netHeight + 5;
+  const rimYPos = netHeight + 4.5;
 
-  const netTopGeometry = new THREE.RingGeometry(
+  // Creat part of the rim that connects to the backboard
+  const rimConnectorGeometry = new THREE.BoxGeometry(0.25, 0.4, 0.5);
+  const rimConnectorMaterial = new THREE.MeshStandardMaterial({
+    color: RIM_COLOR,
+  });
+  const rimConnector = new THREE.Mesh(
+    rimConnectorGeometry,
+    rimConnectorMaterial
+  );
+
+  const rimConnectorXMod = isLeftSide ? 0.25 : -0.25;
+  const rimConnectorXPos = backboardGroup.position.x + rimConnectorXMod;
+  rimConnector.position.set(rimConnectorXPos, rimYPos, 0);
+
+  // Create the ring that makes up the rim
+  const rimGeometry = new THREE.RingGeometry(
     hoopRadius - netWidth / 2,
     hoopRadius + netWidth / 2,
     32
@@ -614,12 +744,15 @@ const createHoop = (side) => {
   const rimMaterial = new THREE.MeshBasicMaterial({
     color: RIM_COLOR,
   });
-  const rim = new THREE.Mesh(netTopGeometry, rimMaterial);
+  const rim = new THREE.Mesh(rimGeometry, rimMaterial);
   rim.rotation.x = -Math.PI / 2; // rotate the ring to be flat
-  rim.position.set(netXPosition, netTopPositionY, 0); // position at the top of the cylinder
+  rim.position.set(netXPos, rimYPos, 0); // position at the top of the cylinder
+
+  const rimGroup = new THREE.Group();
+  rimGroup.add(rim);
+  rimGroup.add(rimConnector);
 
   /* Create the net itself */
-
   const netGeometry = new THREE.CylinderGeometry(
     0.7, // radiusTop
     0.7, // radiusBottom
@@ -643,17 +776,17 @@ const createHoop = (side) => {
   const net = new THREE.Mesh(netGeometry, netMaterial);
   net.name = "net";
 
-  net.position.set(netXPosition, 5, 0);
+  const netYPos = rimYPos - 0.8;
+  net.position.set(netXPos, netYPos, 0);
 
   const netGroup = new THREE.Group();
-  netGroup.add(rim);
+  netGroup.add(rimGroup);
   netGroup.add(net);
 
   /* Group all the hoop components together */
   const hoopGroup = new THREE.Group();
   hoopGroup.add(stanchionGroup);
   hoopGroup.add(backboardGroup);
-  // hoopGroup.add(hoopTop);
   hoopGroup.add(shotClock);
   hoopGroup.add(netGroup);
   return hoopGroup;
@@ -767,7 +900,8 @@ const animate = () => {
   /* Update TWEEN */
   TWEEN.update();
 
-  orbitControls.update(); // update the controls
+  /* Update orbiting controls */
+  orbitControls.update();
 
   renderer.render(scene, camera);
 };
