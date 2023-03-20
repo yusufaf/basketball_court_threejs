@@ -1,5 +1,4 @@
-// import * as THREE from "https://unpkg.com/three/build/three.module.js";
-import * as THREE from "./three.module.js";
+// import * as THREE from "./three.module.js";
 import { OrbitControls } from "https://cdn.skypack.dev/three@0.132.2/examples/jsm/controls/OrbitControls.js";
 import { DragControls } from "https://cdn.skypack.dev/three@0.132.2/examples/jsm/controls/DragControls.js";
 // import * as Ammo from "https://cdn.skypack.dev/three@0.132.2/examples/jsm/libs/ammo.module.js";
@@ -7,6 +6,7 @@ import { DragControls } from "https://cdn.skypack.dev/three@0.132.2/examples/jsm
 
 import * as TWEEN from "https://cdn.jsdelivr.net/npm/@tweenjs/tween.js@18.6.4/+esm";
 
+/* Create the scene and perspective camera */
 const scene = new THREE.Scene();
 /* 
   FOV,
@@ -81,6 +81,13 @@ const SHOT_CLOCK_COLOR = "#f44341";
 const RIM_COLOR = "#eb6b25";
 const STANCHION_COLOR = "#261e1e";
 
+/* NAMED VALUES */
+const DEGS_180 = Math.PI
+const DEGS_90 = Math.PI / 2;
+const DEGS_45 = Math.PI / 4;
+
+const BLACK_MATERIAL = new THREE.MeshBasicMaterial({ color: "black" });
+
 /* Create and load textures */
 const textureLoader = new THREE.TextureLoader();
 const ballTexture = textureLoader.load("textures/basketball_texture2.png");
@@ -91,11 +98,54 @@ const jumbotronTexture = textureLoader.load("textures/blazers_jumbotron.png");
 const backboardTexture = textureLoader.load("textures/nba_backboard.jpg");
 
 const crowdTexture = textureLoader.load("textures/blazers_crowd_1.png");
+const scorersTableTexture = textureLoader.load("textures/scorers_table.jpg");
 
 const netTexture = textureLoader.load("textures/net.png");
 netTexture.repeat.set(2, 0.7);
 netTexture.offset.set(0, 0.3);
 netTexture.wrapS = THREE.RepeatWrapping;
+
+/* Load the GLTF models */
+const gltfLoader = new THREE.GLTFLoader();
+console.log(gltfLoader);
+
+gltfLoader.load("./models/chair.gltf", (gltf) => {
+  const chair = gltf.scene;
+  chair.scale.set(2.5, 2.5, 2.5); // Scale the chair to make it visible
+
+  const TOP_CHAIRS_START_Z = -22.5;
+
+  /* Left Chairs */
+  const leftChairsStartX = (-courtWidth / 2) + 7.5;
+  
+  for (let i = 0; i < 10; i++) {
+    const chairClone = chair.clone();
+    chairClone.rotation.y = -DEGS_90;
+    const xIncrement = i * 2.75;
+    chairClone.position.set(leftChairsStartX + xIncrement, 0, TOP_CHAIRS_START_Z);
+    scene.add(chairClone);
+  }
+
+  /* Scorers Table Chairs */
+  
+
+  /* Right Chairs */
+  const rightchairsStartX = (courtWidth / 2) - 32.5;
+  for (let i = 0; i < 10; i++) {
+    const chairClone = chair.clone();
+    chairClone.rotation.y = -DEGS_90;
+    const xIncrement = i * 2.75;
+    chairClone.position.set(rightchairsStartX + xIncrement, 0, TOP_CHAIRS_START_Z);
+    scene.add(chairClone);
+  }
+
+  /* Bottom Chairs */
+
+
+  console.log({ gltf })
+}
+)
+
 
 /* Add lighting
 - DirectionalLight() - light color, intensity
@@ -112,12 +162,10 @@ const courtWidth = 94;
 const courtHeight = 0.1;
 const courtDepth = 50;
 const courtGeometry = new THREE.BoxGeometry(
-  courtWidth, 
-  courtHeight, 
+  courtWidth,
+  courtHeight,
   courtDepth
 );
-const uvAttribute = courtGeometry.getAttribute("uv");
-const uvArray = uvAttribute.array;
 
 /* .map : Texture ==> The color map. May optionally include an alpha channel, typically combined with .transparent or .alphaTest. Default is null. */
 const courtMaterial = new THREE.MeshBasicMaterial({
@@ -129,13 +177,8 @@ court.name = "court";
 scene.add(court);
 
 /* TODO: Review this, but covering underneath court with black surface */
-const coverGeometry = new THREE.BoxGeometry(
-  courtWidth, 
-  0.05, 
-  courtDepth
-);
-const coverMaterial = new THREE.MeshBasicMaterial({ color: "black" });
-const cover = new THREE.Mesh(coverGeometry, coverMaterial);
+const coverGeometry = new THREE.BoxGeometry(courtWidth, 0.05, courtDepth);
+const cover = new THREE.Mesh(coverGeometry, BLACK_MATERIAL);
 cover.position.set(0, -0.05, 0);
 scene.add(cover);
 
@@ -149,23 +192,30 @@ const crowdWidth = 50;
 const crowdHeight = 20;
 
 // create an array of positions in polar coordinates around the court
+
+// 180 = Math.PI radians
 const crowdPositions = [
-  { radius: 47.5, angle: 0 },
-  { radius: 27, angle: Math.PI },
-  { radius: 47.5, angle: Math.PI / 2 },
-  { radius: 47.5, angle: -Math.PI / 2 },
+  { radius: 25, angle: Math.PI, width: courtWidth, height: 20 },
+  { radius: 25, angle: 0, width: courtWidth, height: 20 },
+  { radius: 47.5, angle: Math.PI / 2, width: 50, height: 20 },
+  { radius: 47.5, angle: 3 * Math.PI / 2, width: 50, height: 20 },
 ];
 
 const crowdMaterials = new THREE.MeshBasicMaterial({ map: crowdTexture });
 
 // create a crowd geometry for each position and add it to the scene
 for (const position of crowdPositions) {
-  const crowdGeometry = new THREE.PlaneGeometry(crowdWidth, crowdHeight);
+  const {radius, angle, width, height} = position;
+
+  const crowdGeometry = new THREE.PlaneGeometry(width, height);
   const crowd = new THREE.Mesh(crowdGeometry, crowdMaterials);
-  const x = position.radius * Math.sin(position.angle);
-  const z = position.radius * Math.cos(position.angle);
+  const x = radius * Math.sin(angle);
+  const z = radius * Math.cos(angle);
   crowd.position.set(x, 10, z);
-  crowd.rotation.y = position.angle;
+  
+  crowd.rotation.y = angle + (DEGS_180);
+  // crowd.rotation.x = -DEGS_45;
+
   scene.add(crowd);
 }
 
@@ -219,8 +269,11 @@ const onBasketballMouseDown = (event) => {
     // Handle the basketball click event
 
     // Animate the basketball rotation
+    const yRotation = basketball.rotation.y + 2 * DEGS_180 
     new TWEEN.Tween(basketball.rotation)
-      .to({ y: basketball.rotation.y + 2 * Math.PI }, 1000)
+      .to({ 
+        y: yRotation
+      }, 1000)
       .start();
   }
 };
@@ -413,10 +466,10 @@ const createBackboard = ({ isLeftSide }) => {
 
   if (isLeftSide) {
     backboardGroup.position.set(BACKBOARD_X, BACKBOARD_Y, 0);
-    backboardGroup.rotation.y = BOARD_ROTATION_Y;
+    backboardGroup.rotation.y = DEGS_90;
   } else {
     backboardGroup.position.set(-BACKBOARD_X, BACKBOARD_Y, 0);
-    backboardGroup.rotation.y = -BOARD_ROTATION_Y;
+    backboardGroup.rotation.y = -DEGS_90;
   }
 
   return backboardGroup;
@@ -448,9 +501,7 @@ const createShotClock = ({ isLeftSide, position, rotation }) => {
     shotClockHeight,
     shotClockDepth
   );
-  const shotClockMaterial = new THREE.MeshBasicMaterial({
-    color: "black",
-  });
+  const shotClockMaterial = BLACK_MATERIAL;
   const shotClock = new THREE.Mesh(shotClockGeometry, shotClockMaterial);
 
   shotClock.position.set(shotClockXPosition, 10, 0);
@@ -665,7 +716,7 @@ const createHoop = (side) => {
     stanchionBarXPos += 0.425;
   }
   stanchionBar.position.set(stanchionBarXPos, 6.5, 0);
-  const stanchionBarRotation = isLeftSide ? Math.PI / 2 : -Math.PI / 2;
+  const stanchionBarRotation = isLeftSide ? DEGS_90 : -DEGS_90;
   stanchionBar.rotation.z = stanchionBarRotation;
 
   /* Create the arm that connects the stanchion to the backboard */
@@ -745,7 +796,7 @@ const createHoop = (side) => {
     color: RIM_COLOR,
   });
   const rim = new THREE.Mesh(rimGeometry, rimMaterial);
-  rim.rotation.x = -Math.PI / 2; // rotate the ring to be flat
+  rim.rotation.x = -DEGS_90; // rotate the ring to be flat
   rim.position.set(netXPos, rimYPos, 0); // position at the top of the cylinder
 
   const rimGroup = new THREE.Group();
@@ -829,7 +880,7 @@ const createJumbotron = () => {
   const topGeometry = new THREE.PlaneGeometry(jumbotronWidth, jumbotronDepth);
   const jumboTop = new THREE.Mesh(topGeometry, blackMaterial);
   jumboTop.position.set(0, jumbotronHeight / 2, 0);
-  jumboTop.rotation.x = -Math.PI / 2;
+  jumboTop.rotation.x = -DEGS_90;
 
   const bottomGeometry = new THREE.PlaneGeometry(
     jumbotronWidth,
@@ -837,7 +888,7 @@ const createJumbotron = () => {
   );
   const jumboBottom = new THREE.Mesh(bottomGeometry, blackMaterial);
   jumboBottom.position.set(0, -jumbotronHeight / 2, 0);
-  jumboBottom.rotation.x = Math.PI / 2;
+  jumboBottom.rotation.x = DEGS_90;
 
   const jumbotronGroup = new THREE.Group();
   jumbotronGroup.add(jumbotron);
@@ -851,8 +902,40 @@ const jumbotron = createJumbotron();
 scene.add(jumbotron);
 
 /* TODO: Create sideline --- announcers table, courtside seats */
+const scorersTableWidth = 25;
+const scorersTableHeight = 3;
+const scorersTableDepth = 3;
+const scorersTableGeometry = new THREE.BoxGeometry(
+  scorersTableWidth,
+  scorersTableHeight,
+  scorersTableDepth
+);
 
-/* TODO: Create stands */
+const scorersTableFrontMaterial = new THREE.MeshStandardMaterial({
+  map: scorersTableTexture,
+});
+
+// Combine the materials into a multi-material
+const scorersTableMaterials = [
+  BLACK_MATERIAL, // left side
+  BLACK_MATERIAL, // right side
+  BLACK_MATERIAL, // top
+  BLACK_MATERIAL, // bottom
+  scorersTableFrontMaterial, // front
+  BLACK_MATERIAL, // back
+];
+const scorersTable = new THREE.Mesh(
+  scorersTableGeometry,
+  scorersTableMaterials
+);
+scorersTable.position.set(0, 1.5, -22.5);
+scene.add(scorersTable);
+
+
+console.log({ scorersTable });
+
+/* Create the chairs/bench */
+
 
 /* Create rendering loop -- renderer draws the scene everytime screen refreshes (60hz) 
        Basically, anything you want to move or change while the app is running has to go through the animate loop. 
