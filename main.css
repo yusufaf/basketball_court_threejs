@@ -1,13 +1,19 @@
-#volume-button {
+#container {
+    position: absolute;
+    display: flex;
+    flex-direction: column;
+    gap: 0.5rem;
+}
+
+#volume-button, #reset-button, #reset-camera-button {
     background: none;
     border: none;
     padding: 0;
-    position: absolute;
     cursor: pointer;
     user-select: none;
 }
 
-#volume-icon {
+.icon {
     color: white;
     font-size: 3rem;
 }

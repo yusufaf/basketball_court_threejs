@@ -23,7 +23,7 @@ const camera = new THREE.PerspectiveCamera(
 
 /* Set camera's initial position and view */
 camera.position.set(0, 50, 50);
-camera.lookAt(0, 0, 0);
+// camera.lookAt(0, 0, 0);
 
 const renderer = new THREE.WebGLRenderer();
 /* Use width and height of area we want to fill */
@@ -60,7 +60,7 @@ audioLoader.load("audio/NBA_Crowd_Sound.mp3", (buffer) => {
   sound.setVolume(0.1);
 });
 
-/* Get the button and icon elements from the HTML */
+/* Get button and icon elements from the HTML */
 const volumeButton = document.getElementById("volume-button");
 const volumeIcon = document.getElementById("volume-icon");
 
@@ -75,14 +75,21 @@ volumeButton.addEventListener("click", () => {
   }
 });
 
+const cameraResetButton = document.getElementById("reset-camera-button");
+cameraResetButton.addEventListener("click", () => {
+  // camera.position.set(0, 50, 50);
+  // camera.lookAt(0, 0, 0);
+});
+
 /* COLORS */
 const GAME_CLOCK_COLOR = "#dc8e50";
 const SHOT_CLOCK_COLOR = "#f44341";
 const RIM_COLOR = "#eb6b25";
 const STANCHION_COLOR = "#261e1e";
+const BLAZERS_RED = "#c8102e";
 
 /* NAMED VALUES */
-const DEGS_180 = Math.PI
+const DEGS_180 = Math.PI;
 const DEGS_90 = Math.PI / 2;
 const DEGS_45 = Math.PI / 4;
 
@@ -116,36 +123,66 @@ gltfLoader.load("./models/chair.gltf", (gltf) => {
   const TOP_CHAIRS_START_Z = -22.5;
 
   /* Left Chairs */
-  const leftChairsStartX = (-courtWidth / 2) + 7.5;
-  
+  const leftChairsStartX = -courtWidth / 2 + 7.5;
+
   for (let i = 0; i < 10; i++) {
     const chairClone = chair.clone();
     chairClone.rotation.y = -DEGS_90;
     const xIncrement = i * 2.75;
-    chairClone.position.set(leftChairsStartX + xIncrement, 0, TOP_CHAIRS_START_Z);
+    chairClone.position.set(
+      leftChairsStartX + xIncrement,
+      0,
+      TOP_CHAIRS_START_Z
+    );
     scene.add(chairClone);
   }
 
   /* Scorers Table Chairs */
-  
+  const scorersTableChair = chair.clone();
+  scorersTableChair.scale.set(2, 2.5, 2.5);
+
+  const scorersTableChairZ = TOP_CHAIRS_START_Z - 1.4;
+  const scorersTableChairStartX = -10;
+  for (let i = 0; i < 8; i++) {
+    const chairClone = scorersTableChair.clone();
+    chairClone.rotation.y = -DEGS_90;
+    const xIncrement = i * 2.75;
+    chairClone.position.set(
+      scorersTableChairStartX + xIncrement,
+      0,
+      scorersTableChairZ
+    );
+    scene.add(chairClone);
+  }
 
   /* Right Chairs */
-  const rightchairsStartX = (courtWidth / 2) - 32.5;
+  const rightchairsStartX = courtWidth / 2 - 32.5;
   for (let i = 0; i < 10; i++) {
     const chairClone = chair.clone();
     chairClone.rotation.y = -DEGS_90;
     const xIncrement = i * 2.75;
-    chairClone.position.set(rightchairsStartX + xIncrement, 0, TOP_CHAIRS_START_Z);
+    chairClone.position.set(
+      rightchairsStartX + xIncrement,
+      0,
+      TOP_CHAIRS_START_Z
+    );
     scene.add(chairClone);
   }
 
   /* Bottom Chairs */
-
-
-  console.log({ gltf })
-}
-)
-
+  const BOTTOM_CHAIRS_START_Z = 23.5;
+  for (let i = 0; i < 30; i++) {
+    const chairClone = chair.clone();
+    chairClone.rotation.y = DEGS_90;
+    const xIncrement = i * 2.75;
+    chairClone.position.set(
+      leftChairsStartX + xIncrement,
+      0,
+      BOTTOM_CHAIRS_START_Z
+    );
+    scene.add(chairClone);
+  }
+});
 
 /* Add lighting
 - DirectionalLight() - light color, intensity
@@ -183,48 +220,36 @@ cover.position.set(0, -0.05, 0);
 scene.add(cover);
 
 /* Create the crowd */
-
-/* 
-- Different width for each crowd position
-*/
-
-const crowdWidth = 50;
-const crowdHeight = 20;
-
-// create an array of positions in polar coordinates around the court
-
-// 180 = Math.PI radians
 const crowdPositions = [
-  { radius: 25, angle: Math.PI, width: courtWidth, height: 20 },
-  { radius: 25, angle: 0, width: courtWidth, height: 20 },
-  { radius: 47.5, angle: Math.PI / 2, width: 50, height: 20 },
-  { radius: 47.5, angle: 3 * Math.PI / 2, width: 50, height: 20 },
+  { radius: courtDepth / 2, angle: DEGS_180, width: courtWidth, height: 20 },
+  { radius: courtDepth / 2, angle: 0, width: courtWidth, height: 20 },
+  { radius: courtWidth / 2, angle: DEGS_90, width: 50, height: 20 },
+  { radius: courtWidth / 2, angle: (3 * Math.PI) / 2, width: 50, height: 20 },
 ];
 
 const crowdMaterials = new THREE.MeshBasicMaterial({ map: crowdTexture });
 
-// create a crowd geometry for each position and add it to the scene
+// Create a crowd geometry for each position and add it to the scene
 for (const position of crowdPositions) {
-  const {radius, angle, width, height} = position;
+  const { radius, angle, width, height } = position;
 
   const crowdGeometry = new THREE.PlaneGeometry(width, height);
   const crowd = new THREE.Mesh(crowdGeometry, crowdMaterials);
   const x = radius * Math.sin(angle);
   const z = radius * Math.cos(angle);
+
   crowd.position.set(x, 10, z);
-  
-  crowd.rotation.y = angle + (DEGS_180);
-  // crowd.rotation.x = -DEGS_45;
+  crowd.rotation.y = angle + DEGS_180;
 
   scene.add(crowd);
 }
 
 /* Create the basketball geometry */
-const initialBallPosition = new THREE.Vector3(0, 5, 0);
+const initialBallPosition = new THREE.Vector3(0, 4, 0);
 const createBasketball = () => {
   /* SphereGeometry -- radius, widthSegments, heightSegments */
-  const basketballRadius = 1.05;
-  const ballWidthSegments = 30;
+  const basketballRadius = 0.6;
+  const ballWidthSegments = 16;
   const ballHeightSegments = 16;
   const geometry = new THREE.SphereGeometry(
     basketballRadius,
@@ -243,10 +268,17 @@ const createBasketball = () => {
 };
 const basketball = createBasketball();
 
-// Create a raycaster
+/* Handle when reset position button is clicked */
+const resetButton = document.getElementById("reset-button");
+
+resetButton.addEventListener("click", () => {
+  basketball.position.copy(initialBallPosition);
+});
+
+/* Create a raycaster */
 const raycaster = new THREE.Raycaster();
 
-// Create a mouse vector
+/* Create a mouse vector */
 const mouse = new THREE.Vector2();
 
 const onBasketballMouseDown = (event) => {
@@ -266,14 +298,16 @@ const onBasketballMouseDown = (event) => {
   );
   if (basketballClicked) {
     console.log("Basketball clicked!");
-    // Handle the basketball click event
 
     // Animate the basketball rotation
-    const yRotation = basketball.rotation.y + 2 * DEGS_180 
+    const yRotation = basketball.rotation.y + 2 * DEGS_180;
     new TWEEN.Tween(basketball.rotation)
-      .to({ 
-        y: yRotation
-      }, 1000)
+      .to(
+        {
+          y: yRotation,
+        },
+        1000
+      )
       .start();
   }
 };
@@ -486,6 +520,7 @@ let leftGameClockTime = QUARTER_LENGTH; // 12 mins in seconds
 let rightGameClockTime = QUARTER_LENGTH; // 12 mins in seconds
 
 const createShotClock = ({ isLeftSide, position, rotation }) => {
+  /* Create the main shot clock */
   const shotClockXIncrement = isLeftSide ? -0.7 : 0.7;
   const shotClockYIncrement = isLeftSide ? -1 : 1;
 
@@ -507,37 +542,73 @@ const createShotClock = ({ isLeftSide, position, rotation }) => {
   shotClock.position.set(shotClockXPosition, 10, 0);
   shotClock.rotation.y = rotation.y;
 
-  /* Define some variables for the text and font size */
-  const fontSize = 200;
+  /* Create the side shot clock */
+  const sideShotClock = shotClock.clone();
+  const sideShotClockXMod = isLeftSide ? -7.25 : 8;
+  const sideShotClockX = shotClockXPosition + sideShotClockXMod;
+  sideShotClock.position.set(sideShotClockX, 10, 0);
+  sideShotClock.rotation.y = DEGS_180;
+  sideShotClock.scale.set(0.8, 0.8, 0.8);
 
   /* Create a canvas and context to draw the text onto */
   const canvas = document.createElement("canvas");
+  const canvas2 = document.createElement("canvas");
+  const canvas3 = document.createElement("canvas");
   const context = canvas.getContext("2d");
+  const context2 = canvas2.getContext("2d");
+  const context3 = canvas3.getContext("2d");
+
+  /* Arrays to hold all the canvases/contexts */
+  const canvases = [canvas, canvas2, canvas3];
+  const canvasContexts = [context, context2, context3];
 
   // Set the canvas dimensions to match the desired text size
-  canvas.width = fontSize * 2;
-  canvas.height = fontSize;
-  // Set the font properties for the text
-  context.font = `${fontSize}px Arial`;
-  context.textAlign = "center";
-  context.textBaseline = "middle";
+  const fontSize = 200;
+  canvases.forEach((canvas) => {
+    canvas.width = fontSize * 2;
+    canvas.height = fontSize;
+  });
 
-  // Create a plane geometry and basic material
-  const geometry = new THREE.PlaneGeometry(3, 3);
-  const material = new THREE.MeshBasicMaterial({
+  // Set the font properties for the text
+  canvasContexts.forEach((context) => {
+    context.font = `${fontSize}px Arial`;
+    context.textAlign = "center";
+    context.textBaseline = "middle";
+  });
+
+  // Create a plane geometry and basic material for the canvases
+  const canvasGeometry = new THREE.PlaneGeometry(3, 3);
+  const canvasMaterial = new THREE.MeshBasicMaterial({
     transparent: true,
   });
 
-  // Create a mesh and position it "above" the shot clock
-  const numberCanvas = new THREE.Mesh(geometry, material);
+  /* Create a mesh for the canvases, position as hovering above shot clock */
+  const numberCanvas = new THREE.Mesh(canvasGeometry, canvasMaterial);
   const numberCanvasIncrement = isLeftSide ? shotClockDepth : -shotClockDepth;
   const numberCanvasPosition = shotClockXPosition + numberCanvasIncrement;
   numberCanvas.position.set(numberCanvasPosition, 10, 0);
   numberCanvas.rotation.y = rotation.y;
 
+  const numberCanvas2 = new THREE.Mesh(canvasGeometry, canvasMaterial);
+  const numberCanvasIncrement2 = isLeftSide
+    ? shotClockDepth - 0.25
+    : -shotClockDepth + 0.25;
+  const numberCanvasPosition2 = sideShotClockX + numberCanvasIncrement2;
+  numberCanvas2.position.set(numberCanvasPosition2, 10, 0.2);
+
+  const numberCanvas3 = numberCanvas2.clone();
+  numberCanvas3.position.set(numberCanvasPosition2, 10, -0.2);
+  numberCanvas3.rotation.y = DEGS_180;
+
+  /* Scale down the side shot clock canvases */
+  numberCanvas2.scale.set(0.75, 0.75, 0.75);
+  numberCanvas3.scale.set(0.75, 0.75, 0.75);
+
   const updateShotClock = () => {
-    /* Clear the whole canvas */
-    context.clearRect(0, 0, canvas.width, canvas.height);
+    /* Clear all canvases */
+    canvasContexts.forEach((context) =>
+      context.clearRect(0, 0, canvas.width, canvas.height)
+    );
 
     /* Determine which time variables to update */
     let currentShotClockTime = rightShotClockTime;
@@ -562,11 +633,17 @@ const createShotClock = ({ isLeftSide, position, rotation }) => {
     }
 
     /* Draw updated game clock and decrement times */
-    context.font = `${fontSize / 2}px Arial`;
-    context.fillStyle = GAME_CLOCK_COLOR;
+    canvasContexts.forEach((context) => {
+      context.font = `${fontSize / 2}px Arial`;
+      context.fillStyle = GAME_CLOCK_COLOR;
+    });
     const gameClockX = canvas.width / 2;
     const gameClockY = canvas.height / 2 - 50;
-    context.fillText(gameClockText, gameClockX, gameClockY);
+
+    canvasContexts.forEach((context) => {
+      context.fillText(gameClockText, gameClockX, gameClockY);
+    });
+
     isLeftSide ? leftGameClockTime-- : rightGameClockTime--;
 
     const shotClockText =
@@ -577,8 +654,11 @@ const createShotClock = ({ isLeftSide, position, rotation }) => {
     /* Draw updated 24-second clock and decrement times */
     const shotClockX = canvas.width / 2;
     const shotClockY = canvas.height / 2 + 50;
-    context.fillStyle = SHOT_CLOCK_COLOR;
-    context.fillText(shotClockText, shotClockX, shotClockY);
+
+    canvasContexts.forEach((context) => {
+      context.fillStyle = SHOT_CLOCK_COLOR;
+      context.fillText(shotClockText, shotClockX, shotClockY);
+    });
     isLeftSide ? leftShotClockTime-- : rightShotClockTime--;
 
     /* Reset game clock time back to 12 mins when it reaches 0*/
@@ -603,42 +683,51 @@ const createShotClock = ({ isLeftSide, position, rotation }) => {
     const texture = new THREE.CanvasTexture(canvas);
     numberCanvas.material.map = texture;
     numberCanvas.material.needsUpdate = true;
+
+    const texture2 = new THREE.CanvasTexture(canvas2);
+    numberCanvas2.material.map = texture2;
+    numberCanvas2.material.needsUpdate = true;
+
+    const texture3 = new THREE.CanvasTexture(canvas3);
+    numberCanvas3.material.map = texture3;
+    numberCanvas3.material.needsUpdate = true;
   };
 
   /* Update the shot clock every second */
   setInterval(updateShotClock, 1000);
 
   /* Create "frame" bars that connect shot clock to back of the rim */
-  const frameBarRadius = 0.25;
-  const frameBarHeight = 1.5;
+  const frameBarRadius = 0.18;
+  const frameBarHeight = 2;
   const frameBarGeometry = new THREE.CylinderGeometry(
     frameBarRadius,
     frameBarRadius,
     frameBarHeight
   );
 
-  const frameBarMaterial = new THREE.MeshStandardMaterial({
-    color: STANCHION_COLOR,
-  });
-  const frameBar1 = new THREE.Mesh(frameBarGeometry, frameBarMaterial);
-  const frameBar2 = new THREE.Mesh(frameBarGeometry, frameBarMaterial);
+  const frameBarMaterial = BLACK_MATERIAL;
+  const shotClockFrameBar = new THREE.Mesh(frameBarGeometry, frameBarMaterial);
 
-  frameBar1.position.set(shotClockXPosition, 10, 0.5);
-  frameBar2.position.set(shotClockXPosition, 10, -0.5);
+  const frameBarXPos1 = shotClockXPosition;
+  shotClockFrameBar.position.set(frameBarXPos1, 7.5, 0);
 
-  frameBar1.rotation.x = -Math.PI / 4;
-  frameBar1.rotation.z = -Math.PI / 4;
+  /* Create the side shot clock frame bar */
+  const sideShotClockFrameBar = shotClockFrameBar.clone();
+  sideShotClockFrameBar.position.set(sideShotClockX, 7, 0);
+  sideShotClockFrameBar.scale.set(1, 2, 1);
 
-  frameBar2.rotation.x = Math.PI / 4;
-  frameBar2.rotation.z = Math.PI / 4;
+  const sideShotClockGroup = new THREE.Group();
+  sideShotClockGroup.add(sideShotClock);
+  sideShotClockGroup.add(numberCanvas2);
+  sideShotClockGroup.add(numberCanvas3);
+  sideShotClockGroup.add(sideShotClockFrameBar);
 
   /* Create a group to hold all the shot clock elements */
   const shotClockGroup = new THREE.Group();
   shotClockGroup.add(shotClock);
   shotClockGroup.add(numberCanvas);
-  shotClockGroup.add(frameBar1);
-  shotClockGroup.add(frameBar2);
-
+  shotClockGroup.add(shotClockFrameBar);
+  shotClockGroup.add(sideShotClockGroup);
   return shotClockGroup;
 };
 
@@ -757,7 +846,7 @@ const createHoop = (side) => {
   /* Create the backboard */
   const backboardGroup = createBackboard({ isLeftSide });
 
-  /* Create the shot clock */
+  /* Create the shot clock(s) */
   const shotClock = createShotClock({
     isLeftSide,
     position: backboardGroup.position,
@@ -847,12 +936,12 @@ const HOOP_X_POSITION = 45;
 
 /* Create the "left" hoop */
 const hoop1 = createHoop("LEFT");
-hoop1.position.set(-HOOP_X_POSITION, 0, 0);
+hoop1.position.set(-HOOP_X_POSITION, -0.25, 0);
 scene.add(hoop1);
 
 /* Create the "right" hoop */
 const hoop2 = createHoop("RIGHT");
-hoop2.position.set(HOOP_X_POSITION, 0, 0);
+hoop2.position.set(HOOP_X_POSITION, -0.25, 0);
 scene.add(hoop2);
 
 /* Create jumbotron at center of court */
@@ -901,10 +990,10 @@ const createJumbotron = () => {
 const jumbotron = createJumbotron();
 scene.add(jumbotron);
 
-/* TODO: Create sideline --- announcers table, courtside seats */
+/* Create announcers table */
 const scorersTableWidth = 25;
 const scorersTableHeight = 3;
-const scorersTableDepth = 3;
+const scorersTableDepth = 2.05;
 const scorersTableGeometry = new THREE.BoxGeometry(
   scorersTableWidth,
   scorersTableHeight,
@@ -928,22 +1017,181 @@ const scorersTable = new THREE.Mesh(
   scorersTableGeometry,
   scorersTableMaterials
 );
-scorersTable.position.set(0, 1.5, -22.5);
+scorersTable.position.set(0, 1.5, -22);
 scene.add(scorersTable);
 
+/* Create monitors on the table */
+const monitorStandGeometry = new THREE.BoxGeometry(0.25, 1, 0.1);
+const monitorStandMaterial = new THREE.MeshStandardMaterial({
+  color: 0x525457,
+});
+const monitorStand = new THREE.Mesh(monitorStandGeometry, monitorStandMaterial);
+monitorStand.position.set(0, -0.5, 0.15);
+monitorStand.rotation.y = -DEGS_90;
 
-console.log({ scorersTable });
+const monitorBaseGeometry = new THREE.BoxGeometry(1, 0.1, 0.5);
+const monitorBaseMaterial = monitorStandMaterial;
+const monitorBase = new THREE.Mesh(monitorBaseGeometry, monitorBaseMaterial);
+monitorBase.position.set(0, -1, 0.15);
 
-/* Create the chairs/bench */
+const monitorStandGroup = new THREE.Group();
+monitorStandGroup.add(monitorStand);
+monitorStandGroup.add(monitorBase);
 
+const monitorWidth = 2;
+const monitorHeight = 1;
+const monitorDepth = 0.1;
+const monitorGeometry = new THREE.BoxGeometry(
+  monitorWidth,
+  monitorHeight,
+  monitorDepth
+);
+const monitorMaterial = new THREE.MeshStandardMaterial({
+  color: 0x525457,
+});
+const monitor = new THREE.Mesh(monitorGeometry, monitorMaterial);
 
-/* Create rendering loop -- renderer draws the scene everytime screen refreshes (60hz) 
-       Basically, anything you want to move or change while the app is running has to go through the animate loop. 
-      You can of course call other functions from there, so that you don't end up with an animate function that's hundreds of lines. 
+const monitorGroup = new THREE.Group();
+monitorGroup.add(monitorStandGroup);
+monitorGroup.add(monitor);
+
+for (let i = 0; i < 8; i++) {
+  const monitorClone = monitorGroup.clone();
+  const monitorXPos = -scorersTableWidth / 2 + 1.5 + i * 3;
+  const monitorYPos = 4;
+  const monitorZPos = -22;
+  monitorClone.position.set(monitorXPos, monitorYPos, monitorZPos);
+  scene.add(monitorClone);
+}
+
+/* Create stick figure */
+const createStickFigure = ({ 
+  color = "red",
+  jerseyColor = "blue",
+  i
+}) => {
+  const headGeometry = new THREE.SphereGeometry(1, 32, 32);
+  const torsoGeometry = new THREE.CylinderGeometry(0.5, 0.5, 2, 32);
+  const limbGeometry = new THREE.CylinderGeometry(0.2, 0.2, 1.5, 32);
+
+  const material = new THREE.MeshStandardMaterial({
+    color,
+  });
+  const head = new THREE.Mesh(headGeometry, material);
+  const torsoMaterial = new THREE.MeshStandardMaterial({
+    color: jerseyColor,
+  });
+  const torso = new THREE.Mesh(torsoGeometry, torsoMaterial);
+
+  const leftArm = new THREE.Mesh(limbGeometry, material);
+  const rightArm = new THREE.Mesh(limbGeometry, material);
+  const leftLeg = new THREE.Mesh(limbGeometry, material);
+  const rightLeg = new THREE.Mesh(limbGeometry, material);
+  
+  head.position.y = 3.5;
+  torso.position.y = 1.5;
+
+  leftArm.position.set(-0.9, 2.5, 0);
+  rightArm.position.set(0.9, 2.5, 0);
+
+  leftArm.rotation.z = DEGS_45;
+  rightArm.rotation.z = -DEGS_45;
+
+  leftLeg.position.set(-0.5, 0.5, 0);
+  rightLeg.position.set(0.5, 0.5, 0);
+
+  const stickFigureGroup = new THREE.Group();
+  stickFigureGroup.add(head);
+  stickFigureGroup.add(torso);
+  stickFigureGroup.add(leftArm);
+  stickFigureGroup.add(rightArm);
+  stickFigureGroup.add(leftLeg);
+  stickFigureGroup.add(rightLeg);
+
+  stickFigureGroup.name = `stickFigure${i}`;
+
+  return stickFigureGroup;
+};
+
+/* Layout
+- 2 Players in the top corner
+- 2 players at the top of the key
+- 2 players at the bottom of the key
+- 2 players in the right wing
+- 2 players in the left wing
 */
 
-let basketballY = 5;
-let basketballX = 0;
+const leftTeamData = [
+  { 
+    position: { x: -12, y: 0.25, z: 0 }, // Top of the Key
+    rotation: { x: 0, y: DEGS_90, z: 0 },
+  },
+  {
+    position: { x: -32, y: 0.25, z: -5 }, // Paint
+    rotation: { x: 0, y: DEGS_90, z: 0 },
+  },
+  {
+    position: { x: -16, y: 0.25, z: -11 }, // Right Wing
+    rotation: { x: 0, y: DEGS_90, z: 0 },
+  },
+  {
+    position: { x: -22, y: 0.25, z: 13 }, // Left Wing
+    rotation: { x: 0, y: DEGS_90, z: 0 },
+  },
+  {
+    position: { x: -32, y: 0.25, z: -14.5 }, // Top Corner
+    rotation: { x: 0, y: DEGS_180, z: 0 },
+  }
+];
+
+const rightTeamData = [
+  { 
+    position: { x: -8, y: 0.25, z: 0 }, // Top of the Key
+    rotation: { x: 0, y: DEGS_90, z: 0 },
+  },
+  {
+    position: { x: -29, y: 0.25, z: -5 }, // Paint
+    rotation: { x: 0, y: DEGS_90, z: 0 },
+  },
+  {
+    position: { x: -12, y: 0.25, z: -11 }, // Right Wing
+    rotation: { x: 0, y: DEGS_90, z: 0 },
+  },
+  {
+    position: { x: -18, y: 0.25, z: 13 }, // Left Wing
+    rotation: { x: 0, y: DEGS_90, z: 0 },
+  },
+  {
+    position: { x: -32, y: 0.25, z: -18.5 }, // Top Corner
+    rotation: { x: 0, y: DEGS_180, z: 0 },
+  }
+];
+
+for (let i = 0; i < 5; i++) {
+  const stickFigure = createStickFigure({
+    color: "#003399",
+    jerseyColor: "#fcc723",
+    i
+  });
+  const position = Object.values(leftTeamData[i].position);
+  stickFigure.position.set(...position);
+  const rotation = Object.values(leftTeamData[i].rotation);
+  stickFigure.rotation.set(...rotation);
+  scene.add(stickFigure);
+}
+
+for (let i = 0; i < 5; i++) {
+  const stickFigure = createStickFigure({
+    color: BLAZERS_RED,
+    jerseyColor: "black",
+    i
+  });
+  const position = Object.values(rightTeamData[i].position);
+  stickFigure.position.set(...position);
+  const rotation = Object.values(rightTeamData[i].rotation);
+  stickFigure.rotation.set(...rotation);
+  scene.add(stickFigure);
+}
 
 /* Enable drag controls */
 const objects = [basketball];
@@ -972,13 +1220,12 @@ dragControls.addEventListener("drag", (event) => {
   }
 });
 
+/* Create rendering loop -- renderer draws the scene everytime screen refreshes (60hz) 
+       Basically, anything you want to move or change while the app is running has to go through the animate loop. 
+      You can of course call other functions from there, so that you don't end up with an animate function that's hundreds of lines. 
+*/
 const animate = () => {
   requestAnimationFrame(animate);
-
-  /* 0.05 = amplitude, 0.005 = frequency */
-  // basketballX += 0.05 * Math.cos(Date.now() * 0.005);
-  // basketballY += 0.125 * Math.sin(Date.now() * 0.005);
-  // basketball.position.set(basketballX, basketballY, 0);
 
   /* Update TWEEN */
   TWEEN.update();
