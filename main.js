@@ -1,9 +1,5 @@
-// import * as THREE from "./three.module.js";
 import { OrbitControls } from "https://cdn.skypack.dev/three@0.132.2/examples/jsm/controls/OrbitControls.js";
 import { DragControls } from "https://cdn.skypack.dev/three@0.132.2/examples/jsm/controls/DragControls.js";
-// import * as Ammo from "https://cdn.skypack.dev/three@0.132.2/examples/jsm/libs/ammo.module.js";
-// import * as Ammo from "./ammo.js";
-
 import * as TWEEN from "https://cdn.jsdelivr.net/npm/@tweenjs/tween.js@18.6.4/+esm";
 
 /* Create the scene and perspective camera */
@@ -23,7 +19,7 @@ const camera = new THREE.PerspectiveCamera(
 
 /* Set camera's initial position and view */
 camera.position.set(0, 50, 50);
-// camera.lookAt(0, 0, 0);
+camera.lookAt(0, 50, 50);
 
 const renderer = new THREE.WebGLRenderer();
 /* Use width and height of area we want to fill */
@@ -34,12 +30,7 @@ const canvasElement = renderer.domElement;
 /* Append canvas element */
 document.body.appendChild(canvasElement);
 
-// const physicsWorld = new Ammo.btDiscreteDynamicsWorld(
-//   new Ammo.btCollisionDispatcher(new Ammo.btDefaultCollisionConfiguration()),
-//   new Ammo.btDbvtBroadphase(),
-//   new Ammo.btSequentialImpulseConstraintSolver(),
-//   new Ammo.btDefaultCollisionConfiguration()
-// );
+/* TODO: Create a physics world in Ammo */
 
 /* Enable orbiting controls */
 const orbitControls = new OrbitControls(camera, canvasElement);
@@ -77,8 +68,7 @@ volumeButton.addEventListener("click", () => {
 
 const cameraResetButton = document.getElementById("reset-camera-button");
 cameraResetButton.addEventListener("click", () => {
-  // camera.position.set(0, 50, 50);
-  // camera.lookAt(0, 0, 0);
+  camera.position.set(0, 50, 50);
 });
 
 /* COLORS */
@@ -114,8 +104,6 @@ netTexture.wrapS = THREE.RepeatWrapping;
 
 /* Load the GLTF models */
 const gltfLoader = new THREE.GLTFLoader();
-console.log(gltfLoader);
-
 gltfLoader.load("./models/chair.gltf", (gltf) => {
   const chair = gltf.scene;
   chair.scale.set(2.5, 2.5, 2.5); // Scale the chair to make it visible
@@ -297,20 +285,23 @@ const onBasketballMouseDown = (event) => {
     (intersect) => intersect.object.name === "basketball"
   );
   if (basketballClicked) {
-    console.log("Basketball clicked!");
-
-    // Animate the basketball rotation
-    const yRotation = basketball.rotation.y + 2 * DEGS_180;
-    new TWEEN.Tween(basketball.rotation)
-      .to(
-        {
-          y: yRotation,
-        },
-        1000
-      )
-      .start();
+    animateBasketballRotation(basketball);
   }
 };
+
+function animateBasketballRotation(basketball) {
+  const zRotation = basketball.rotation.z + 2 * DEGS_180;
+  const yRotation = basketball.rotation.y + 2 * DEGS_180;
+  new TWEEN.Tween(basketball.rotation)
+    .to(
+      {
+        z: zRotation,
+      },
+      1000
+    )
+    .start();
+}
+
 canvasElement.addEventListener("mousedown", onBasketballMouseDown);
 scene.add(basketball);
 
@@ -732,6 +723,9 @@ const createShotClock = ({ isLeftSide, position, rotation }) => {
 };
 
 /* Create hoops */
+// let leftNetCenter;
+// let rightNetCenter;
+
 const createHoop = (side) => {
   const isLeftSide = side === "LEFT";
 
@@ -861,6 +855,9 @@ const createHoop = (side) => {
   const netHeight = 1.5;
   const rimYPos = netHeight + 4.5;
 
+  // const testVector = new THREE.Vector3(netXPos, rimYPos, 0);
+  // isLeftSide ? leftNetCenter = testVector : rightNetCenter = testVector;
+
   // Creat part of the rim that connects to the backboard
   const rimConnectorGeometry = new THREE.BoxGeometry(0.25, 0.4, 0.5);
   const rimConnectorMaterial = new THREE.MeshStandardMaterial({
@@ -881,8 +878,10 @@ const createHoop = (side) => {
     hoopRadius + netWidth / 2,
     32
   );
+
   const rimMaterial = new THREE.MeshBasicMaterial({
     color: RIM_COLOR,
+    side: THREE.DoubleSide,
   });
   const rim = new THREE.Mesh(rimGeometry, rimMaterial);
   rim.rotation.x = -DEGS_90; // rotate the ring to be flat
@@ -911,12 +910,11 @@ const createHoop = (side) => {
     side: THREE.DoubleSide,
     transparent: true,
     // opacity: 0.8,
-    depthWrite: false,
   });
   const net = new THREE.Mesh(netGeometry, netMaterial);
   net.name = "net";
 
-  const netYPos = rimYPos - 0.8;
+  const netYPos = rimYPos - 0.75;
   net.position.set(netXPos, netYPos, 0);
 
   const netGroup = new THREE.Group();
@@ -960,32 +958,19 @@ const createJumbotron = () => {
   const jumbotronMaterial = new THREE.MeshStandardMaterial({
     map: jumbotronTexture,
   });
-  const jumbotron = new THREE.Mesh(jumbotronGeometry, jumbotronMaterial);
 
-  // Create black materials for the top and bottom faces
-  const blackMaterial = new THREE.MeshBasicMaterial({ color: 0x000000 });
+  const jumbotronMaterials = [
+    jumbotronMaterial, // right side
+    jumbotronMaterial, // left side
+    BLACK_MATERIAL, // top side
+    BLACK_MATERIAL, // bottom side
+    jumbotronMaterial, // front side
+    jumbotronMaterial, // back side
+  ];
 
-  // Create meshes for the top and bottom faces
-  const topGeometry = new THREE.PlaneGeometry(jumbotronWidth, jumbotronDepth);
-  const jumboTop = new THREE.Mesh(topGeometry, blackMaterial);
-  jumboTop.position.set(0, jumbotronHeight / 2, 0);
-  jumboTop.rotation.x = -DEGS_90;
-
-  const bottomGeometry = new THREE.PlaneGeometry(
-    jumbotronWidth,
-    jumbotronDepth
-  );
-  const jumboBottom = new THREE.Mesh(bottomGeometry, blackMaterial);
-  jumboBottom.position.set(0, -jumbotronHeight / 2, 0);
-  jumboBottom.rotation.x = DEGS_90;
-
-  const jumbotronGroup = new THREE.Group();
-  jumbotronGroup.add(jumbotron);
-  jumbotronGroup.add(jumboTop);
-  jumbotronGroup.add(jumboBottom);
-
-  jumbotronGroup.position.set(0, 35, 0);
-  return jumbotronGroup;
+  const jumbotron = new THREE.Mesh(jumbotronGeometry, jumbotronMaterials);
+  jumbotron.position.set(0, 35, 0);
+  return jumbotron;
 };
 const jumbotron = createJumbotron();
 scene.add(jumbotron);
@@ -1065,11 +1050,7 @@ for (let i = 0; i < 8; i++) {
 }
 
 /* Create stick figure */
-const createStickFigure = ({ 
-  color = "red",
-  jerseyColor = "blue",
-  i
-}) => {
+const createStickFigure = ({ color = "red", jerseyColor = "blue", i }) => {
   const headGeometry = new THREE.SphereGeometry(1, 32, 32);
   const torsoGeometry = new THREE.CylinderGeometry(0.5, 0.5, 2, 32);
   const limbGeometry = new THREE.CylinderGeometry(0.2, 0.2, 1.5, 32);
@@ -1087,7 +1068,7 @@ const createStickFigure = ({
   const rightArm = new THREE.Mesh(limbGeometry, material);
   const leftLeg = new THREE.Mesh(limbGeometry, material);
   const rightLeg = new THREE.Mesh(limbGeometry, material);
-  
+
   head.position.y = 3.5;
   torso.position.y = 1.5;
 
@@ -1122,7 +1103,7 @@ const createStickFigure = ({
 */
 
 const leftTeamData = [
-  { 
+  {
     position: { x: -12, y: 0.25, z: 0 }, // Top of the Key
     rotation: { x: 0, y: DEGS_90, z: 0 },
   },
@@ -1141,11 +1122,11 @@ const leftTeamData = [
   {
     position: { x: -32, y: 0.25, z: -14.5 }, // Top Corner
     rotation: { x: 0, y: DEGS_180, z: 0 },
-  }
+  },
 ];
 
 const rightTeamData = [
-  { 
+  {
     position: { x: -8, y: 0.25, z: 0 }, // Top of the Key
     rotation: { x: 0, y: DEGS_90, z: 0 },
   },
@@ -1164,14 +1145,14 @@ const rightTeamData = [
   {
     position: { x: -32, y: 0.25, z: -18.5 }, // Top Corner
     rotation: { x: 0, y: DEGS_180, z: 0 },
-  }
+  },
 ];
 
 for (let i = 0; i < 5; i++) {
   const stickFigure = createStickFigure({
     color: "#003399",
     jerseyColor: "#fcc723",
-    i
+    i,
   });
   const position = Object.values(leftTeamData[i].position);
   stickFigure.position.set(...position);
@@ -1184,7 +1165,7 @@ for (let i = 0; i < 5; i++) {
   const stickFigure = createStickFigure({
     color: BLAZERS_RED,
     jerseyColor: "black",
-    i
+    i,
   });
   const position = Object.values(rightTeamData[i].position);
   stickFigure.position.set(...position);
@@ -1212,7 +1193,14 @@ dragControls.addEventListener("drag", (event) => {
 
   if (isBasketball) {
     const { x, y, z } = event.object.position;
-    console.log({ x, y, z });
+
+    // Check if the basketball has been dragged far enough to trigger the animation
+    if (
+      Math.abs(x - initialBallPosition.x) > 1 ||
+      Math.abs(z - initialBallPosition.z) > 1
+    ) {
+      animateBasketballRotation(event.object);
+    }
 
     if (y < 0) {
       basketball.position.copy(initialBallPosition);
@@ -1232,6 +1220,16 @@ const animate = () => {
 
   /* Update orbiting controls */
   orbitControls.update();
+
+  // // const hoopCenter = new THREE.Vector3(0, 4, -20); // assuming the hoop is centered at (0, 4, -20)
+  // const ballRadius = 0.6;
+  // const hoopRadius = 0.7;
+  // const leftDistance = leftNetCenter.distanceTo(basketball.position);
+  // const rightDistance = rightNetCenter.distanceTo(basketball.position);
+  // if (leftDistance < ballRadius + hoopRadius | rightDistance < ballRadius + hoopRadius) {
+  //   console.log("Score!");
+  // }
+  
 
   renderer.render(scene, camera);
 };
