@@ -14,7 +14,9 @@ I've known about Three.js for a while, but I'd never used it. Listened to a lect
 # Viewing
 I realize that I've had to always run a local server using a VS Code extension to actually view my Three.js + HTML, as I run into a CORS issue trying to load a local JavaScript file.
 
-This isn't very convenient
+This isn't very convenient, so the project can be viewed at the URL below
+
+https://beautiful-sunshine-e1b72e.netlify.app/
 
 # Resources
 - Chair Model: "Foldable chair" (https://skfb.ly/o97OI) by 1.raphael.wanders.2.mi.ma is licensed under Creative Commons Attribution (http://creativecommons.org/licenses/by/4.0/).
